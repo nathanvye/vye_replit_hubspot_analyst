@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ReportView } from "@/components/ReportView";
 import { 
   Send, 
   Bot, 
@@ -18,7 +19,9 @@ import {
   LogOut,
   Menu,
   X,
-  BrainCircuit
+  BrainCircuit,
+  FileText,
+  MessageSquare
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -29,6 +32,8 @@ interface Message {
   timestamp: string;
 }
 
+type ViewMode = "chat" | "report";
+
 export default function DashboardPage() {
   const { user, selectedAccount, logout } = useAuth();
   const [, setLocation] = useLocation();
@@ -36,6 +41,7 @@ export default function DashboardPage() {
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("chat");
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -48,10 +54,10 @@ export default function DashboardPage() {
   }, [user, selectedAccount, setLocation]);
 
   useEffect(() => {
-    if (scrollRef.current) {
+    if (scrollRef.current && viewMode === "chat") {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, isTyping]);
+  }, [messages, isTyping, viewMode]);
 
   const handleSendMessage = (content: string) => {
     if (!content.trim()) return;
@@ -71,15 +77,24 @@ export default function DashboardPage() {
     setTimeout(() => {
       let responseContent = "I've analyzed the data based on your request. Here are the findings...";
       
+      const lowerContent = content.toLowerCase();
+
       // Basic "Learning" simulation
-      if (content.toLowerCase().includes("call") && content.toLowerCase().includes("something else")) {
+      if (lowerContent.includes("call") && lowerContent.includes("something else")) {
         responseContent = "Understood. I've updated my knowledge base. In future analyses, I will refer to this deal type using your preferred terminology. My training model has been adjusted for this account.";
         toast({
           title: "Knowledge Base Updated",
           description: "The system has learned a new definition.",
         });
-      } else if (content.toLowerCase().includes("analyze")) {
+      } else if (lowerContent.includes("analyze")) {
          responseContent = "Based on the Q4 data from HubSpot:\n\n• Deal velocity has increased by 12%\n• Top performing rep is Sarah J.\n• 3 major deals are stuck in negotiation.\n\nWould you like a breakdown of the stalled deals?";
+      } else if (lowerContent.includes("report") || lowerContent.includes("generate")) {
+         responseContent = "I've generated the October 2025 Report for you. You can view the full details in the Reports tab.";
+         toast({
+            title: "Report Generated",
+            description: "October 2025 Report is now available.",
+         });
+         setViewMode("report");
       }
 
       const aiMessage: Message = {
@@ -115,6 +130,28 @@ export default function DashboardPage() {
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
               Connected & Syncing
             </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">Navigation</h3>
+          <div className="space-y-1">
+            <Button 
+              variant={viewMode === "chat" ? "secondary" : "ghost"} 
+              className="w-full justify-start text-sm h-9"
+              onClick={() => { setViewMode("chat"); setIsSidebarOpen(false); }}
+            >
+              <MessageSquare className="w-4 h-4 mr-2" />
+              Chat Analysis
+            </Button>
+            <Button 
+              variant={viewMode === "report" ? "secondary" : "ghost"} 
+              className="w-full justify-start text-sm h-9"
+              onClick={() => { setViewMode("report"); setIsSidebarOpen(false); }}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Generated Reports
+            </Button>
           </div>
         </div>
 
@@ -185,108 +222,116 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        {/* Chat Area */}
+        {/* Content Area */}
         <div className="flex-1 overflow-hidden relative flex flex-col">
-          <ScrollArea className="flex-1 p-4 md:p-6" ref={scrollRef}>
-             <div className="max-w-3xl mx-auto space-y-6 pb-4">
-               {messages.map((msg) => (
-                 <motion.div 
-                    key={msg.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                 >
-                   {msg.role === 'assistant' && (
-                     <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-1">
-                       <Bot className="w-5 h-5 text-primary" />
-                     </div>
-                   )}
+          {viewMode === "report" ? (
+            <ScrollArea className="flex-1">
+              <ReportView />
+            </ScrollArea>
+          ) : (
+            <>
+              <ScrollArea className="flex-1 p-4 md:p-6" ref={scrollRef}>
+                 <div className="max-w-3xl mx-auto space-y-6 pb-4">
+                   {messages.map((msg) => (
+                     <motion.div 
+                        key={msg.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                     >
+                       {msg.role === 'assistant' && (
+                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-1">
+                           <Bot className="w-5 h-5 text-primary" />
+                         </div>
+                       )}
+                       
+                       <div className={`
+                          max-w-[85%] rounded-2xl p-4 shadow-sm
+                          ${msg.role === 'user' 
+                            ? 'bg-primary text-primary-foreground rounded-tr-sm' 
+                            : 'bg-card border border-border rounded-tl-sm text-foreground'}
+                       `}>
+                         <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                       </div>
+    
+                       {msg.role === 'user' && (
+                         <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0 mt-1">
+                           <UserIcon className="w-5 h-5 text-secondary-foreground" />
+                         </div>
+                       )}
+                     </motion.div>
+                   ))}
                    
-                   <div className={`
-                      max-w-[85%] rounded-2xl p-4 shadow-sm
-                      ${msg.role === 'user' 
-                        ? 'bg-primary text-primary-foreground rounded-tr-sm' 
-                        : 'bg-card border border-border rounded-tl-sm text-foreground'}
-                   `}>
-                     <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                   </div>
-
-                   {msg.role === 'user' && (
-                     <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0 mt-1">
-                       <UserIcon className="w-5 h-5 text-secondary-foreground" />
-                     </div>
+                   {isTyping && (
+                     <motion.div 
+                       initial={{ opacity: 0 }} 
+                       animate={{ opacity: 1 }}
+                       className="flex gap-4"
+                     >
+                       <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                         <Sparkles className="w-4 h-4 text-primary animate-spin" />
+                       </div>
+                       <div className="bg-card border border-border rounded-2xl rounded-tl-sm p-4 shadow-sm">
+                         <div className="flex gap-1">
+                           <span className="w-2 h-2 bg-muted-foreground/30 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                           <span className="w-2 h-2 bg-muted-foreground/30 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                           <span className="w-2 h-2 bg-muted-foreground/30 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                         </div>
+                       </div>
+                     </motion.div>
                    )}
-                 </motion.div>
-               ))}
-               
-               {isTyping && (
-                 <motion.div 
-                   initial={{ opacity: 0 }} 
-                   animate={{ opacity: 1 }}
-                   className="flex gap-4"
-                 >
-                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                     <Sparkles className="w-4 h-4 text-primary animate-spin" />
-                   </div>
-                   <div className="bg-card border border-border rounded-2xl rounded-tl-sm p-4 shadow-sm">
-                     <div className="flex gap-1">
-                       <span className="w-2 h-2 bg-muted-foreground/30 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                       <span className="w-2 h-2 bg-muted-foreground/30 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                       <span className="w-2 h-2 bg-muted-foreground/30 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                     </div>
-                   </div>
-                 </motion.div>
-               )}
-             </div>
-          </ScrollArea>
-
-          {/* Input Area */}
-          <div className="p-4 md:p-6 bg-background/80 backdrop-blur border-t border-border">
-            <div className="max-w-3xl mx-auto">
-              {messages.length < 3 && (
-                <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
-                  {SUGGESTED_PROMPTS.map((prompt, i) => (
+                 </div>
+              </ScrollArea>
+    
+              {/* Input Area */}
+              <div className="p-4 md:p-6 bg-background/80 backdrop-blur border-t border-border">
+                <div className="max-w-3xl mx-auto">
+                  {messages.length < 3 && (
+                    <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
+                      {SUGGESTED_PROMPTS.map((prompt, i) => (
+                        <Button 
+                          key={i} 
+                          variant="outline" 
+                          size="sm" 
+                          className="whitespace-nowrap rounded-full bg-background hover:bg-muted/50 text-xs"
+                          onClick={() => handleSendMessage(prompt)}
+                        >
+                          {prompt}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                  
+                  <form 
+                    onSubmit={(e) => { e.preventDefault(); handleSendMessage(inputValue); }}
+                    className="relative flex items-center gap-2"
+                  >
+                    <Input
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      placeholder="Ask about your data, or train me on new terms..."
+                      className="pr-12 py-6 rounded-xl shadow-sm border-muted-foreground/20 focus-visible:ring-primary/20"
+                      disabled={isTyping}
+                      autoFocus
+                    />
                     <Button 
-                      key={i} 
-                      variant="outline" 
-                      size="sm" 
-                      className="whitespace-nowrap rounded-full bg-background hover:bg-muted/50 text-xs"
-                      onClick={() => handleSendMessage(prompt)}
+                      type="submit" 
+                      size="icon" 
+                      className="absolute right-2 h-8 w-8 rounded-lg" 
+                      disabled={!inputValue.trim() || isTyping}
                     >
-                      {prompt}
+                      <Send className="w-4 h-4" />
                     </Button>
-                  ))}
+                  </form>
+                  <div className="text-center mt-2">
+                    <p className="text-[10px] text-muted-foreground">
+                      AI can make mistakes. Please verify important information.
+                    </p>
+                  </div>
                 </div>
-              )}
-              
-              <form 
-                onSubmit={(e) => { e.preventDefault(); handleSendMessage(inputValue); }}
-                className="relative flex items-center gap-2"
-              >
-                <Input
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  placeholder="Ask about your data, or train me on new terms..."
-                  className="pr-12 py-6 rounded-xl shadow-sm border-muted-foreground/20 focus-visible:ring-primary/20"
-                  disabled={isTyping}
-                  autoFocus
-                />
-                <Button 
-                  type="submit" 
-                  size="icon" 
-                  className="absolute right-2 h-8 w-8 rounded-lg" 
-                  disabled={!inputValue.trim() || isTyping}
-                >
-                  <Send className="w-4 h-4" />
-                </Button>
-              </form>
-              <div className="text-center mt-2">
-                <p className="text-[10px] text-muted-foreground">
-                  AI can make mistakes. Please verify important information.
-                </p>
               </div>
-            </div>
-          </div>
+            </>
+          )}
         </div>
       </main>
     </div>
