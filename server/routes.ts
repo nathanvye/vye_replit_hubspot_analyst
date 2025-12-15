@@ -97,10 +97,12 @@ export async function registerRoutes(
 
       // Store the account with encrypted API key
       const encryptedApiKey = encrypt(apiKey);
+      const secretKeyName = `hubspot_${userId}_${Date.now()}`;
       const account = await storage.createHubspotAccount({
         userId,
         name,
         portalId: validation.portalId || null,
+        secretKeyName,
         apiKey: encryptedApiKey
       });
 

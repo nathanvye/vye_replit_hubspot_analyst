@@ -21,8 +21,9 @@ export const hubspotAccounts = pgTable("hubspot_accounts", {
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(), // Display name for the account
   portalId: text("portal_id"), // HubSpot portal ID (fetched from API)
-  apiKey: text("api_key").notNull(), // Private App access token
+  secretKeyName: text("secret_key_name").notNull(), // Unique key name for the encrypted API key
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  apiKey: text("api_key").notNull(), // Private App access token (encrypted)
 });
 
 export const insertHubspotAccountSchema = createInsertSchema(hubspotAccounts).omit({ 
