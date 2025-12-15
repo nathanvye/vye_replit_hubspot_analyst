@@ -1,18 +1,87 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// User accounts (authenticated vye.agency users)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  email: text("email").notNull().unique(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
-});
-
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+// Conversations - represents a chat session with context about a specific HubSpot account
+export const conversations = pgTable("conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  hubspotAccountId: text("hubspot_account_id").notNull(), // The HubSpot portal ID
+  hubspotAccountName: text("hubspot_account_name").notNull(),
+  title: text("title"), // Auto-generated summary of conversation
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertConversationSchema = createInsertSchema(conversations).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+export type InsertConversation = z.infer<typeof insertConversationSchema>;
+export type Conversation = typeof conversations.$inferSelect;
+
+// Messages in a conversation
+export const messages = pgTable("messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").notNull().references(() => conversations.id, { onDelete: "cascade" }),
+  role: text("role").notNull().$type<"user" | "assistant">(),
+  content: text("content").notNull(),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+});
+
+export const insertMessageSchema = createInsertSchema(messages).omit({ 
+  id: true, 
+  timestamp: true 
+});
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type Message = typeof messages.$inferSelect;
+
+// Learned context - stores custom terminology and definitions that the AI learns
+export const learnedContext = pgTable("learned_context", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").references(() => conversations.id, { onDelete: "cascade" }),
+  hubspotAccountId: text("hubspot_account_id"), // Can be account-specific or global (null)
+  contextType: text("context_type").notNull(), // "terminology", "deal_stage", "custom_field", etc.
+  key: text("key").notNull(), // The term or field name
+  value: text("value").notNull(), // The definition or mapping
+  metadata: jsonb("metadata"), // Additional context (e.g., examples, synonyms)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertLearnedContextSchema = createInsertSchema(learnedContext).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type InsertLearnedContext = z.infer<typeof insertLearnedContextSchema>;
+export type LearnedContext = typeof learnedContext.$inferSelect;
+
+// Generated reports
+export const reports = pgTable("reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").references(() => conversations.id, { onDelete: "cascade" }),
+  hubspotAccountId: text("hubspot_account_id").notNull(),
+  title: text("title").notNull(),
+  reportData: jsonb("report_data").notNull(), // Structured report data
+  generatedAt: timestamp("generated_at").defaultNow().notNull(),
+});
+
+export const insertReportSchema = createInsertSchema(reports).omit({ 
+  id: true, 
+  generatedAt: true 
+});
+export type InsertReport = z.infer<typeof insertReportSchema>;
+export type Report = typeof reports.$inferSelect;
