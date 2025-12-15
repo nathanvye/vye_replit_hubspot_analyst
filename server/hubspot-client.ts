@@ -1,96 +1,41 @@
 import { Client } from '@hubspot/api-client';
 
-let connectionSettings: any;
-
-async function getAccessToken() {
-  if (connectionSettings && connectionSettings.settings.expires_at && new Date(connectionSettings.settings.expires_at).getTime() > Date.now()) {
-    return connectionSettings.settings.access_token;
-  }
-  
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
-
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
-  }
-
-  connectionSettings = await fetch(
-    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=hubspot',
-    {
-      headers: {
-        'Accept': 'application/json',
-        'X_REPLIT_TOKEN': xReplitToken
-      }
-    }
-  ).then(res => res.json()).then(data => data.items?.[0]);
-
-  const accessToken = connectionSettings?.settings?.access_token || connectionSettings.settings?.oauth?.credentials?.access_token;
-
-  if (!connectionSettings || !accessToken) {
-    throw new Error('HubSpot not connected');
-  }
-  return accessToken;
+// Create a HubSpot client with a user-provided API key (private app access token)
+export function createHubSpotClient(apiKey: string) {
+  return new Client({ accessToken: apiKey });
 }
 
-// WARNING: Never cache this client.
-// Access tokens expire, so a new client must be created each time.
-// Always call this function again to get a fresh client.
-export async function getUncachableHubSpotClient() {
-  const accessToken = await getAccessToken();
-  return new Client({ accessToken });
-}
-
-// HubSpot data fetching utilities
-export async function getHubSpotAccounts() {
-  const client = await getUncachableHubSpotClient();
-  
-  // Get account/portal details from the API
+// Validate an API key by fetching account info
+export async function validateApiKeyAndGetAccountInfo(apiKey: string): Promise<{
+  valid: boolean;
+  portalId?: string;
+  accountName?: string;
+  error?: string;
+}> {
   try {
+    const client = createHubSpotClient(apiKey);
     const response: any = await client.apiRequest({
       method: 'GET',
       path: '/account-info/v3/details',
     });
     
-    const portalId = response.portalId?.toString() || 'default';
-    const accountName = response.companyName || response.accountType || `Portal ${portalId}`;
-    const accountType = response.accountType || 'HubSpot';
-    
-    return [{
-      id: portalId,
-      name: accountName,
-      type: accountType
-    }];
-  } catch (error) {
-    console.error('Error fetching HubSpot account details:', error);
-    // Fallback: try to get portal ID from a simple API call
-    try {
-      const owners: any = await client.crm.owners.ownersApi.getPage();
-      if (owners.results && owners.results.length > 0) {
-        const portalId = owners.results[0].userId?.toString() || 'default';
-        return [{
-          id: portalId,
-          name: 'Your HubSpot Portal',
-          type: 'Connected'
-        }];
-      }
-    } catch (fallbackError) {
-      console.error('Fallback error:', fallbackError);
-    }
-    
-    return [{
-      id: 'default',
-      name: 'Connected HubSpot Account',
-      type: 'Connected'
-    }];
+    return {
+      valid: true,
+      portalId: response.portalId?.toString(),
+      accountName: response.companyName || response.accountType || `Portal ${response.portalId}`
+    };
+  } catch (error: any) {
+    console.error('API key validation error:', error);
+    return {
+      valid: false,
+      error: error.message || 'Invalid API key'
+    };
   }
 }
 
-export async function getDeals(limit = 100) {
-  const client = await getUncachableHubSpotClient();
+// HubSpot data fetching utilities - all functions now require an API key
+export async function getDeals(apiKey: string, limit = 100) {
+  const client = createHubSpotClient(apiKey);
   
   const response = await client.crm.deals.basicApi.getPage(limit, undefined, [
     'dealname',
@@ -105,8 +50,8 @@ export async function getDeals(limit = 100) {
   return response.results;
 }
 
-export async function getContacts(limit = 100) {
-  const client = await getUncachableHubSpotClient();
+export async function getContacts(apiKey: string, limit = 100) {
+  const client = createHubSpotClient(apiKey);
   
   const response = await client.crm.contacts.basicApi.getPage(limit, undefined, [
     'firstname',
@@ -121,8 +66,8 @@ export async function getContacts(limit = 100) {
   return response.results;
 }
 
-export async function getCompanies(limit = 100) {
-  const client = await getUncachableHubSpotClient();
+export async function getCompanies(apiKey: string, limit = 100) {
+  const client = createHubSpotClient(apiKey);
   
   const response = await client.crm.companies.basicApi.getPage(limit, undefined, [
     'name',
@@ -136,8 +81,8 @@ export async function getCompanies(limit = 100) {
   return response.results;
 }
 
-export async function searchDeals(filters: any) {
-  const client = await getUncachableHubSpotClient();
+export async function searchDeals(apiKey: string, filters: any) {
+  const client = createHubSpotClient(apiKey);
   
   const searchRequest = {
     filterGroups: filters.filterGroups || [],

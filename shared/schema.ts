@@ -15,6 +15,23 @@ export const insertUserSchema = createInsertSchema(users).omit({ id: true, creat
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
+// HubSpot accounts - stores account info and API key (encrypted for internal tool use)
+export const hubspotAccounts = pgTable("hubspot_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(), // Display name for the account
+  portalId: text("portal_id"), // HubSpot portal ID (fetched from API)
+  apiKey: text("api_key").notNull(), // Private App access token
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertHubspotAccountSchema = createInsertSchema(hubspotAccounts).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type InsertHubspotAccount = z.infer<typeof insertHubspotAccountSchema>;
+export type HubspotAccount = typeof hubspotAccounts.$inferSelect;
+
 // Conversations - represents a chat session with context about a specific HubSpot account
 export const conversations = pgTable("conversations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

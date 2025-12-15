@@ -3,6 +3,7 @@ import pg from "pg";
 import * as schema from "@shared/schema";
 import type { 
   InsertUser, User, 
+  InsertHubspotAccount, HubspotAccount,
   InsertConversation, Conversation,
   InsertMessage, Message,
   InsertLearnedContext, LearnedContext,
@@ -22,6 +23,13 @@ export interface IStorage {
   // Users
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  
+  // HubSpot Accounts
+  getHubspotAccountsByUser(userId: string): Promise<HubspotAccount[]>;
+  getHubspotAccountById(id: string): Promise<HubspotAccount | undefined>;
+  createHubspotAccount(account: InsertHubspotAccount): Promise<HubspotAccount>;
+  deleteHubspotAccount(id: string): Promise<void>;
+  updateHubspotAccountPortalId(id: string, portalId: string): Promise<void>;
   
   // Conversations
   getConversationsByUser(userId: string): Promise<Conversation[]>;
@@ -53,6 +61,37 @@ class Storage implements IStorage {
   async createUser(user: InsertUser): Promise<User> {
     const result = await db.insert(schema.users).values(user).returning();
     return result[0];
+  }
+
+  // HubSpot Accounts
+  async getHubspotAccountsByUser(userId: string): Promise<HubspotAccount[]> {
+    return await db.select()
+      .from(schema.hubspotAccounts)
+      .where(eq(schema.hubspotAccounts.userId, userId))
+      .orderBy(desc(schema.hubspotAccounts.createdAt));
+  }
+
+  async getHubspotAccountById(id: string): Promise<HubspotAccount | undefined> {
+    const result = await db.select()
+      .from(schema.hubspotAccounts)
+      .where(eq(schema.hubspotAccounts.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createHubspotAccount(account: InsertHubspotAccount): Promise<HubspotAccount> {
+    const result = await db.insert(schema.hubspotAccounts).values(account).returning();
+    return result[0];
+  }
+
+  async deleteHubspotAccount(id: string): Promise<void> {
+    await db.delete(schema.hubspotAccounts).where(eq(schema.hubspotAccounts.id, id));
+  }
+
+  async updateHubspotAccountPortalId(id: string, portalId: string): Promise<void> {
+    await db.update(schema.hubspotAccounts)
+      .set({ portalId })
+      .where(eq(schema.hubspotAccounts.id, id));
   }
 
   // Conversations

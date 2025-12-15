@@ -1,9 +1,28 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { getHubSpotAccounts, getDeals, getContacts, getCompanies, searchDeals } from "./hubspot-client";
+import { 
+  getDeals, 
+  getContacts, 
+  getCompanies, 
+  searchDeals,
+  validateApiKeyAndGetAccountInfo
+} from "./hubspot-client";
 import { analyzeWithAI, generateReport, extractLearning } from "./ai-service";
+import { encrypt, decrypt } from "./encryption";
 import { z } from "zod";
+
+// Helper to get API key for a HubSpot account
+async function getApiKeyForAccount(accountId: string): Promise<string | null> {
+  const account = await storage.getHubspotAccountById(accountId);
+  if (!account || !account.apiKey) return null;
+  try {
+    return decrypt(account.apiKey);
+  } catch (error) {
+    console.error("Error decrypting API key:", error);
+    return null;
+  }
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -21,7 +40,6 @@ export async function registerRoutes(
 
       let user = await storage.getUserByEmail(email);
       if (!user) {
-        // Auto-create user on first login
         const name = email.split("@")[0].split(".").map((n: string) => 
           n.charAt(0).toUpperCase() + n.slice(1)
         ).join(" ");
@@ -36,18 +54,102 @@ export async function registerRoutes(
     }
   });
 
-  // Get HubSpot accounts
-  app.get("/api/hubspot/accounts", async (req, res) => {
+  // ==========================================
+  // HubSpot Account Management
+  // ==========================================
+
+  // Get user's HubSpot accounts
+  app.get("/api/hubspot/accounts/:userId", async (req, res) => {
     try {
-      const accounts = await getHubSpotAccounts();
-      res.json(accounts);
+      const { userId } = req.params;
+      const accounts = await storage.getHubspotAccountsByUser(userId);
+      
+      // Return accounts without secret key names for security
+      const safeAccounts = accounts.map(a => ({
+        id: a.id,
+        name: a.name,
+        portalId: a.portalId,
+        createdAt: a.createdAt
+      }));
+      
+      res.json(safeAccounts);
     } catch (error) {
       console.error("Error fetching HubSpot accounts:", error);
       res.status(500).json({ error: "Failed to fetch HubSpot accounts" });
     }
   });
 
-  // Create or get conversation
+  // Add a new HubSpot account
+  app.post("/api/hubspot/accounts", async (req, res) => {
+    try {
+      const { userId, name, apiKey } = req.body;
+      
+      if (!userId || !name || !apiKey) {
+        return res.status(400).json({ error: "Missing required fields: userId, name, apiKey" });
+      }
+
+      // Validate the API key by trying to fetch account info
+      const validation = await validateApiKeyAndGetAccountInfo(apiKey);
+      
+      if (!validation.valid) {
+        return res.status(400).json({ error: validation.error || "Invalid API key" });
+      }
+
+      // Store the account with encrypted API key
+      const encryptedApiKey = encrypt(apiKey);
+      const account = await storage.createHubspotAccount({
+        userId,
+        name,
+        portalId: validation.portalId || null,
+        apiKey: encryptedApiKey
+      });
+
+      res.json({
+        id: account.id,
+        name: account.name,
+        portalId: account.portalId,
+        createdAt: account.createdAt,
+        accountName: validation.accountName
+      });
+    } catch (error) {
+      console.error("Error adding HubSpot account:", error);
+      res.status(500).json({ error: "Failed to add HubSpot account" });
+    }
+  });
+
+  // Delete a HubSpot account
+  app.delete("/api/hubspot/accounts/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteHubspotAccount(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting HubSpot account:", error);
+      res.status(500).json({ error: "Failed to delete HubSpot account" });
+    }
+  });
+
+  // Validate an API key
+  app.post("/api/hubspot/validate-key", async (req, res) => {
+    try {
+      const { apiKey } = req.body;
+      
+      if (!apiKey) {
+        return res.status(400).json({ error: "API key is required" });
+      }
+
+      const validation = await validateApiKeyAndGetAccountInfo(apiKey);
+      res.json(validation);
+    } catch (error) {
+      console.error("Error validating API key:", error);
+      res.status(500).json({ error: "Failed to validate API key" });
+    }
+  });
+
+  // ==========================================
+  // Conversations
+  // ==========================================
+
   app.post("/api/conversations", async (req, res) => {
     try {
       const { userId, hubspotAccountId, hubspotAccountName } = req.body;
@@ -66,7 +168,6 @@ export async function registerRoutes(
     }
   });
 
-  // Get conversation messages
   app.get("/api/conversations/:id/messages", async (req, res) => {
     try {
       const { id } = req.params;
@@ -78,7 +179,10 @@ export async function registerRoutes(
     }
   });
 
-  // Get learned context for account
+  // ==========================================
+  // Learned Context
+  // ==========================================
+
   app.get("/api/learned-context/:hubspotAccountId", async (req, res) => {
     try {
       const { hubspotAccountId } = req.params;
@@ -90,7 +194,10 @@ export async function registerRoutes(
     }
   });
 
-  // Send chat message and get AI response
+  // ==========================================
+  // Chat
+  // ==========================================
+
   app.post("/api/chat", async (req, res) => {
     try {
       const { conversationId, content, userId } = req.body;
@@ -99,57 +206,56 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Missing required fields" });
       }
 
-      // Get conversation
       const conversation = await storage.getConversationById(conversationId);
       if (!conversation) {
         return res.status(404).json({ error: "Conversation not found" });
       }
 
-      // Save user message
+      // Get API key for this HubSpot account
+      const apiKey = await getApiKeyForAccount(conversation.hubspotAccountId);
+
       const userMessage = await storage.createMessage({
         conversationId,
         role: "user",
         content,
       });
 
-      // Get conversation history and learned context
       const history = await storage.getMessagesByConversation(conversationId);
       const learnedContext = await storage.getLearnedContextByAccount(conversation.hubspotAccountId);
 
-      // Fetch relevant HubSpot data based on query
+      // Fetch relevant HubSpot data if we have an API key
       let hubspotData = null;
       const lowerContent = content.toLowerCase();
       
-      if (lowerContent.includes("deal") || lowerContent.includes("revenue") || lowerContent.includes("pipeline")) {
-        try {
-          hubspotData = { deals: await getDeals(50) };
-        } catch (error) {
-          console.error("Error fetching HubSpot deals:", error);
-        }
-      } else if (lowerContent.includes("contact") || lowerContent.includes("lead")) {
-        try {
-          hubspotData = { contacts: await getContacts(50) };
-        } catch (error) {
-          console.error("Error fetching HubSpot contacts:", error);
+      if (apiKey) {
+        if (lowerContent.includes("deal") || lowerContent.includes("revenue") || lowerContent.includes("pipeline")) {
+          try {
+            hubspotData = { deals: await getDeals(apiKey, 50) };
+          } catch (error) {
+            console.error("Error fetching HubSpot deals:", error);
+          }
+        } else if (lowerContent.includes("contact") || lowerContent.includes("lead")) {
+          try {
+            hubspotData = { contacts: await getContacts(apiKey, 50) };
+          } catch (error) {
+            console.error("Error fetching HubSpot contacts:", error);
+          }
         }
       }
 
-      // Analyze with AI
       const aiResponse = await analyzeWithAI({
-        conversationHistory: history.slice(-10), // Last 10 messages for context
+        conversationHistory: history.slice(-10),
         learnedContext,
         hubspotData,
         userQuery: content,
       });
 
-      // Save AI response
       const assistantMessage = await storage.createMessage({
         conversationId,
         role: "assistant",
         content: aiResponse,
       });
 
-      // Check if user is teaching new context
       const learning = extractLearning(content, aiResponse);
       if (learning.detected && learning.key && learning.value) {
         await storage.createLearnedContext({
@@ -173,27 +279,30 @@ export async function registerRoutes(
     }
   });
 
-  // Generate report
+  // ==========================================
+  // Reports
+  // ==========================================
+
   app.post("/api/reports/generate", async (req, res) => {
     try {
       const { conversationId, hubspotAccountId } = req.body;
 
-      // Fetch HubSpot data
+      const apiKey = await getApiKeyForAccount(hubspotAccountId);
+      
+      if (!apiKey) {
+        return res.status(400).json({ error: "HubSpot account not configured or API key missing" });
+      }
+
       const [deals, contacts, companies] = await Promise.all([
-        getDeals(100),
-        getContacts(100),
-        getCompanies(50),
+        getDeals(apiKey, 100),
+        getContacts(apiKey, 100),
+        getCompanies(apiKey, 50),
       ]);
 
       const hubspotData = { deals, contacts, companies };
-
-      // Get learned context
       const learnedContext = await storage.getLearnedContextByAccount(hubspotAccountId);
-
-      // Generate report using AI
       const reportData = await generateReport(hubspotData, learnedContext);
 
-      // Save report
       const report = await storage.createReport({
         conversationId: conversationId || null,
         hubspotAccountId,
@@ -208,7 +317,6 @@ export async function registerRoutes(
     }
   });
 
-  // Get reports for account
   app.get("/api/reports/:hubspotAccountId", async (req, res) => {
     try {
       const { hubspotAccountId } = req.params;
@@ -220,11 +328,21 @@ export async function registerRoutes(
     }
   });
 
-  // Get HubSpot deals
-  app.get("/api/hubspot/deals", async (req, res) => {
+  // ==========================================
+  // HubSpot Data (direct access)
+  // ==========================================
+
+  app.get("/api/hubspot/deals/:accountId", async (req, res) => {
     try {
+      const { accountId } = req.params;
       const limit = parseInt(req.query.limit as string) || 100;
-      const deals = await getDeals(limit);
+      
+      const apiKey = await getApiKeyForAccount(accountId);
+      if (!apiKey) {
+        return res.status(400).json({ error: "HubSpot account not configured" });
+      }
+      
+      const deals = await getDeals(apiKey, limit);
       res.json(deals);
     } catch (error) {
       console.error("Error fetching deals:", error);

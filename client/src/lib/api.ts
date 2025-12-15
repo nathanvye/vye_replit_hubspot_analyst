@@ -27,7 +27,8 @@ export interface Message {
 export interface HubSpotAccount {
   id: string;
   name: string;
-  type: string;
+  portalId: string | null;
+  createdAt: string;
 }
 
 export interface LearnedContext {
@@ -48,9 +49,42 @@ export const api = {
     return res.json();
   },
 
-  async getHubSpotAccounts(): Promise<HubSpotAccount[]> {
-    const res = await fetch("/api/hubspot/accounts");
+  async getHubSpotAccounts(userId: string): Promise<HubSpotAccount[]> {
+    const res = await fetch(`/api/hubspot/accounts/${userId}`);
     if (!res.ok) throw new Error("Failed to fetch accounts");
+    return res.json();
+  },
+
+  async addHubSpotAccount(userId: string, name: string, apiKey: string): Promise<HubSpotAccount & { accountName?: string }> {
+    const res = await fetch("/api/hubspot/accounts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, name, apiKey }),
+    });
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.error || "Failed to add account");
+    }
+    return res.json();
+  },
+
+  async deleteHubSpotAccount(id: string): Promise<void> {
+    const res = await fetch(`/api/hubspot/accounts/${id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Failed to delete account");
+  },
+
+  async validateHubSpotApiKey(apiKey: string): Promise<{
+    valid: boolean;
+    portalId?: string;
+    accountName?: string;
+    error?: string;
+  }> {
+    const res = await fetch("/api/hubspot/validate-key", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ apiKey }),
+    });
+    if (!res.ok) throw new Error("Failed to validate API key");
     return res.json();
   },
 
