@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useLocation } from "wouter";
-import { MOCK_ACCOUNTS, INITIAL_MESSAGES, SUGGESTED_PROMPTS } from "@/lib/mockData";
-import { motion, AnimatePresence } from "framer-motion";
+import { api } from "@/lib/api";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -25,6 +25,12 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+const SUGGESTED_PROMPTS = [
+  "Analyze our deal pipeline",
+  "Show recent contacts",
+  "What's our revenue this quarter?"
+];
+
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -35,17 +41,15 @@ interface Message {
 type ViewMode = "chat" | "report";
 
 export default function DashboardPage() {
-  const { user, selectedAccount, logout } = useAuth();
+  const { user, selectedAccount, selectedAccountName, conversationId, logout } = useAuth();
   const [, setLocation] = useLocation();
-  const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("chat");
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
-
-  const account = MOCK_ACCOUNTS.find(a => a.id === selectedAccount);
 
   useEffect(() => {
     if (!user || !selectedAccount) {
@@ -54,59 +58,64 @@ export default function DashboardPage() {
   }, [user, selectedAccount, setLocation]);
 
   useEffect(() => {
+    if (conversationId) {
+      api.getMessages(conversationId).then(existingMessages => {
+        setMessages(existingMessages.map(m => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          timestamp: m.timestamp
+        })));
+      }).catch(err => console.error("Failed to load messages:", err));
+    }
+  }, [conversationId]);
+
+  useEffect(() => {
     if (scrollRef.current && viewMode === "chat") {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, isTyping, viewMode]);
 
-  const handleSendMessage = (content: string) => {
-    if (!content.trim()) return;
+  const handleSendMessage = async (content: string) => {
+    if (!content.trim() || !conversationId || !user) return;
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      role: "user",
-      content,
-      timestamp: new Date().toISOString(),
-    };
-
-    setMessages(prev => [...prev, newMessage]);
     setInputValue("");
     setIsTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      let responseContent = "I've analyzed the data based on your request. Here are the findings...";
+    try {
+      const response = await api.sendMessage(conversationId, content, user.id);
       
-      const lowerContent = content.toLowerCase();
+      setMessages(prev => [...prev, 
+        {
+          id: response.userMessage.id,
+          role: response.userMessage.role,
+          content: response.userMessage.content,
+          timestamp: response.userMessage.timestamp
+        },
+        {
+          id: response.assistantMessage.id,
+          role: response.assistantMessage.role,
+          content: response.assistantMessage.content,
+          timestamp: response.assistantMessage.timestamp
+        }
+      ]);
 
-      // Basic "Learning" simulation
-      if (lowerContent.includes("call") && lowerContent.includes("something else")) {
-        responseContent = "Understood. I've updated my knowledge base. In future analyses, I will refer to this deal type using your preferred terminology. My training model has been adjusted for this account.";
+      if (response.learned) {
         toast({
           title: "Knowledge Base Updated",
-          description: "The system has learned a new definition.",
+          description: "The system has learned from your input.",
         });
-      } else if (lowerContent.includes("analyze")) {
-         responseContent = "Based on the Q4 data from HubSpot:\n\n• Deal velocity has increased by 12%\n• Top performing rep is Sarah J.\n• 3 major deals are stuck in negotiation.\n\nWould you like a breakdown of the stalled deals?";
-      } else if (lowerContent.includes("report") || lowerContent.includes("generate")) {
-         responseContent = "I've generated the October 2025 Report for you. You can view the full details in the Reports tab.";
-         toast({
-            title: "Report Generated",
-            description: "October 2025 Report is now available.",
-         });
-         setViewMode("report");
       }
-
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: responseContent,
-        timestamp: new Date().toISOString(),
-      };
-      
-      setMessages(prev => [...prev, aiMessage]);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   const Sidebar = () => (
@@ -124,7 +133,7 @@ export default function DashboardPage() {
           <div className="bg-sidebar-accent/50 rounded-lg p-3 border border-sidebar-border">
             <div className="flex items-center gap-2 mb-2">
               <Database className="w-4 h-4 text-primary" />
-              <span className="font-medium text-sm">{account?.name || "Loading..."}</span>
+              <span className="font-medium text-sm">{selectedAccountName || "Loading..."}</span>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
@@ -213,7 +222,7 @@ export default function DashboardPage() {
             <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(true)}>
               <Menu className="w-5 h-5" />
             </Button>
-            <h2 className="text-lg font-semibold">{account?.name}</h2>
+            <h2 className="text-lg font-semibold">{selectedAccountName}</h2>
           </div>
           <div className="flex items-center gap-2">
              <Button variant="outline" size="sm" className="hidden sm:flex">

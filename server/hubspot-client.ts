@@ -48,20 +48,39 @@ export async function getUncachableHubSpotClient() {
 export async function getHubSpotAccounts() {
   const client = await getUncachableHubSpotClient();
   
-  // Get account info from the API
+  // Get account/portal details from the API
   try {
-    const accountInfo: any = await client.apiRequest({
+    const response: any = await client.apiRequest({
       method: 'GET',
-      path: '/account-info/v3/api-usage/daily',
+      path: '/account-info/v3/details',
     });
     
+    const portalId = response.portalId?.toString() || 'default';
+    const accountName = response.companyName || response.accountType || `Portal ${portalId}`;
+    const accountType = response.accountType || 'HubSpot';
+    
     return [{
-      id: accountInfo.portalId?.toString() || 'default',
-      name: `HubSpot Account ${accountInfo.portalId || 'Connected'}`,
-      type: 'Connected'
+      id: portalId,
+      name: accountName,
+      type: accountType
     }];
   } catch (error) {
-    console.error('Error fetching HubSpot accounts:', error);
+    console.error('Error fetching HubSpot account details:', error);
+    // Fallback: try to get portal ID from a simple API call
+    try {
+      const owners: any = await client.crm.owners.ownersApi.getPage();
+      if (owners.results && owners.results.length > 0) {
+        const portalId = owners.results[0].userId?.toString() || 'default';
+        return [{
+          id: portalId,
+          name: 'Your HubSpot Portal',
+          type: 'Connected'
+        }];
+      }
+    } catch (fallbackError) {
+      console.error('Fallback error:', fallbackError);
+    }
+    
     return [{
       id: 'default',
       name: 'Connected HubSpot Account',
