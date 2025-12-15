@@ -36,7 +36,7 @@ export type HubspotAccount = typeof hubspotAccounts.$inferSelect;
 export const conversations = pgTable("conversations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  hubspotAccountId: text("hubspot_account_id").notNull(), // The HubSpot portal ID
+  hubspotAccountId: text("hubspot_account_id").notNull(), // References hubspot_accounts.id (database ID)
   hubspotAccountName: text("hubspot_account_name").notNull(),
   title: text("title"), // Auto-generated summary of conversation
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -71,7 +71,7 @@ export type Message = typeof messages.$inferSelect;
 export const learnedContext = pgTable("learned_context", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   conversationId: varchar("conversation_id").references(() => conversations.id, { onDelete: "cascade" }),
-  hubspotAccountId: text("hubspot_account_id"), // Can be account-specific or global (null)
+  hubspotAccountId: text("hubspot_account_id"), // References hubspot_accounts.id (database ID)
   contextType: text("context_type").notNull(), // "terminology", "deal_stage", "custom_field", etc.
   key: text("key").notNull(), // The term or field name
   value: text("value").notNull(), // The definition or mapping
