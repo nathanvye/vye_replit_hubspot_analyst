@@ -6,7 +6,8 @@ import {
   getContacts, 
   getCompanies, 
   searchDeals,
-  validateApiKeyAndGetAccountInfo
+  validateApiKeyAndGetAccountInfo,
+  getComprehensiveData
 } from "./hubspot-client";
 import { analyzeWithAI, generateReport, extractLearning } from "./ai-service";
 import { encrypt, decrypt } from "./encryption";
@@ -225,47 +226,18 @@ export async function registerRoutes(
       const history = await storage.getMessagesByConversation(conversationId);
       const learnedContext = await storage.getLearnedContextByAccount(conversation.hubspotAccountId);
 
-      // Fetch relevant HubSpot data if we have an API key
+      // Fetch comprehensive HubSpot data if we have an API key
       let hubspotData: any = null;
       let hubspotError: string | null = null;
-      const lowerContent = content.toLowerCase();
       
       if (apiKey) {
-        if (lowerContent.includes("deal") || lowerContent.includes("revenue") || lowerContent.includes("pipeline")) {
-          try {
-            hubspotData = { deals: await getDeals(apiKey, 50) };
-          } catch (error: any) {
-            console.error("Error fetching HubSpot deals:", error);
-            hubspotError = error.body?.category === 'MISSING_SCOPES' 
-              ? "The HubSpot Private App is missing required scopes. Please add 'crm.objects.deals.read' scope in HubSpot Settings > Private Apps."
-              : "Unable to fetch deals from HubSpot.";
-          }
-        } else if (lowerContent.includes("contact") || lowerContent.includes("lead")) {
-          try {
-            hubspotData = { contacts: await getContacts(apiKey, 50) };
-          } catch (error: any) {
-            console.error("Error fetching HubSpot contacts:", error);
-            hubspotError = error.body?.category === 'MISSING_SCOPES'
-              ? "The HubSpot Private App is missing required scopes. Please add 'crm.objects.contacts.read' scope in HubSpot Settings > Private Apps."
-              : "Unable to fetch contacts from HubSpot.";
-          }
-        } else {
-          // For general questions, try to fetch both
-          try {
-            const [contacts, deals] = await Promise.allSettled([
-              getContacts(apiKey, 20),
-              getDeals(apiKey, 20)
-            ]);
-            hubspotData = {};
-            if (contacts.status === 'fulfilled') hubspotData.contacts = contacts.value;
-            if (deals.status === 'fulfilled') hubspotData.deals = deals.value;
-            if (Object.keys(hubspotData).length === 0) {
-              hubspotError = "Unable to fetch data from HubSpot. The Private App may be missing required scopes (crm.objects.contacts.read, crm.objects.deals.read).";
-            }
-          } catch (error) {
-            console.error("Error fetching HubSpot data:", error);
-            hubspotError = "Unable to connect to HubSpot API.";
-          }
+        try {
+          hubspotData = await getComprehensiveData(apiKey);
+        } catch (error: any) {
+          console.error("Error fetching HubSpot data:", error);
+          hubspotError = error.body?.category === 'MISSING_SCOPES'
+            ? "The HubSpot Private App is missing required scopes. Please add 'crm.objects.deals.read', 'crm.objects.contacts.read', and 'crm.objects.companies.read' scopes in HubSpot Settings > Private Apps."
+            : "Unable to fetch data from HubSpot: " + (error.body?.message || error.message);
         }
       } else {
         hubspotError = "No API key found for this HubSpot account.";
@@ -322,13 +294,8 @@ export async function registerRoutes(
         return res.status(400).json({ error: "HubSpot account not configured or API key missing" });
       }
 
-      const [deals, contacts, companies] = await Promise.all([
-        getDeals(apiKey, 100),
-        getContacts(apiKey, 100),
-        getCompanies(apiKey, 50),
-      ]);
-
-      const hubspotData = { deals, contacts, companies };
+      // Use comprehensive data with pre-calculated summaries
+      const hubspotData = await getComprehensiveData(apiKey);
       const learnedContext = await storage.getLearnedContextByAccount(hubspotAccountId);
       const reportData = await generateReport(hubspotData, learnedContext);
 
