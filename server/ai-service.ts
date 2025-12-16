@@ -87,24 +87,37 @@ export async function generateReport(hubspotData: any, context: LearnedContext[]
       ).join('\n')}`
     : '';
 
-  const prompt = `Analyze the following HubSpot data and generate a comprehensive monthly report with these sections:
+  // Calculate actual stats from the data
+  const dealCount = hubspotData.deals?.length || 0;
+  const contactCount = hubspotData.contacts?.length || 0;
+  const companyCount = hubspotData.companies?.length || 0;
+  const totalDealValue = hubspotData.deals?.reduce((sum: number, d: any) => sum + (parseFloat(d.properties?.amount) || 0), 0) || 0;
 
-1. KPI Performance (format as table with projections vs actuals)
-2. Revenue Generation insights
-3. Lead Generation & Nurturing insights
-4. Recommendations
+  const prompt = `Analyze the following HubSpot data and generate a report.
+
+CRITICAL RULES:
+- ONLY use numbers and facts from the actual data below
+- DO NOT invent, estimate, or fabricate any numbers
+- If the data doesn't contain certain metrics, say "Data not available" instead of making up numbers
+- The actual counts are: ${dealCount} deals, ${contactCount} contacts, ${companyCount} companies, total deal value: $${totalDealValue.toFixed(2)}
 
 HubSpot Data:
 ${JSON.stringify(hubspotData, null, 2)}
 ${learnedContextPrompt}
 
-Return the response as a JSON object with this structure:
+Generate a report with these sections based ONLY on the actual data:
+1. Data Summary - exact counts and values from the data
+2. Deal Analysis - analyze only the deals provided
+3. Contact Analysis - analyze only the contacts provided  
+4. Recommendations - based on the actual data patterns
+
+Return as JSON:
 {
-  "title": "Month Year Report",
-  "subtitle": "Key Insights & Findings",
-  "kpiData": [...],
-  "revenueInsights": [...],
-  "leadGenInsights": [...],
+  "title": "HubSpot Data Report",
+  "subtitle": "Analysis of ${dealCount} deals, ${contactCount} contacts",
+  "dataSummary": { "deals": ${dealCount}, "contacts": ${contactCount}, "companies": ${companyCount}, "totalDealValue": ${totalDealValue} },
+  "dealAnalysis": [...],
+  "contactAnalysis": [...],
   "recommendations": [...]
 }`;
 
@@ -113,11 +126,11 @@ Return the response as a JSON object with this structure:
     messages: [
       { 
         role: 'system', 
-        content: 'You are a data analyst creating structured reports from HubSpot CRM data. Always return valid JSON.' 
+        content: 'You are a data analyst. ONLY report facts from the provided data. NEVER invent or estimate numbers. If data is missing, say so. Always return valid JSON.' 
       },
       { role: 'user', content: prompt }
     ],
-    temperature: 0.5,
+    temperature: 0.2,
     response_format: { type: 'json_object' },
   });
 
