@@ -10,11 +10,12 @@ interface AnalysisContext {
   conversationHistory: Message[];
   learnedContext: LearnedContext[];
   hubspotData?: any;
+  hubspotError?: string | null;
   userQuery: string;
 }
 
 export async function analyzeWithAI(context: AnalysisContext): Promise<string> {
-  const { conversationHistory, learnedContext, hubspotData, userQuery } = context;
+  const { conversationHistory, learnedContext, hubspotData, hubspotError, userQuery } = context;
 
   // Build system prompt with learned context
   const learnedContextPrompt = learnedContext.length > 0
@@ -23,12 +24,15 @@ export async function analyzeWithAI(context: AnalysisContext): Promise<string> {
       ).join('\n')}`
     : '';
 
-  const systemPrompt = `You are an expert HubSpot data analyst for Vye Agency. You help analyze CRM data, generate insights, and create reports.
+  const systemPrompt = `You are an expert HubSpot data analyst for Vye Agency. You are directly connected to the user's HubSpot CRM via API and can pull real-time data to answer their questions.
+
+IMPORTANT: You have direct API access to HubSpot. Do NOT ask users to export data or manually look things up. When you receive HubSpot data in your context, analyze it directly and provide insights.
 
 When users teach you new terminology or definitions (e.g., "we call X deals Y instead"), acknowledge that you've learned it and will use it going forward.
 
 Your capabilities:
-- Analyze deal pipelines, revenue trends, and conversion rates
+- Pull and analyze deal pipelines, revenue trends, and conversion rates directly from HubSpot
+- Access contact and company data from the CRM
 - Identify bottlenecks and opportunities
 - Generate actionable recommendations
 - Remember custom terminology and context specific to this account
@@ -52,8 +56,10 @@ ${learnedContextPrompt}`;
 
   // Add current query with HubSpot data context if available
   let userContent = userQuery;
-  if (hubspotData) {
-    userContent += `\n\nRelevant HubSpot Data:\n${JSON.stringify(hubspotData, null, 2)}`;
+  if (hubspotData && Object.keys(hubspotData).length > 0) {
+    userContent += `\n\n[HUBSPOT DATA - Analyze this directly]:\n${JSON.stringify(hubspotData, null, 2)}`;
+  } else if (hubspotError) {
+    userContent += `\n\n[HUBSPOT API ERROR]: ${hubspotError}\nPlease inform the user about this configuration issue and explain how to fix it.`;
   }
   
   messages.push({ role: 'user', content: userContent });
