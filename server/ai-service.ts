@@ -107,66 +107,76 @@ export async function generateReport(hubspotData: any, context: LearnedContext[]
   const companyCount = summary.totalCompanies || 0;
   const totalDealValue = summary.totalDealValue || 0;
 
-  // Build stage breakdown
-  const stageBreakdown = Object.entries(summary.byStage || {})
-    .map(([stage, data]: [string, any]) => `${stage}: ${data.count} deals worth $${data.totalValue.toFixed(2)}`)
-    .join('\n');
+  // SERVER-SIDE: Build stage breakdown arrays (not from AI)
+  const dealsByStage = Object.entries(summary.byStage || {}).map(([stage, data]: [string, any]) => ({
+    stage,
+    count: data.count,
+    value: data.totalValue
+  }));
 
-  // Build owner breakdown  
-  const ownerBreakdown = Object.entries(summary.byOwner || {})
-    .map(([owner, data]: [string, any]) => `${owner}: ${data.deals} deals worth $${data.totalValue.toFixed(2)}`)
-    .join('\n');
+  // SERVER-SIDE: Build owner breakdown arrays (not from AI)
+  const dealsByOwner = Object.entries(summary.byOwner || {}).map(([owner, data]: [string, any]) => ({
+    owner,
+    count: data.deals,
+    value: data.totalValue
+  }));
 
-  const prompt = `Generate a report from this HubSpot data.
+  // SERVER-SIDE: Calculate closed won deals
+  const closedWonDeals = (hubspotData.deals || []).filter((d: any) => 
+    d.stage?.toLowerCase().includes('closed') || d.stage?.toLowerCase().includes('won')
+  );
+  const closedWonValue = closedWonDeals.reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
+  
+  // SERVER-SIDE: Calculate open deals
+  const openDeals = (hubspotData.deals || []).filter((d: any) => 
+    !d.stage?.toLowerCase().includes('closed') && !d.stage?.toLowerCase().includes('lost')
+  );
+  const openDealsValue = openDeals.reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
 
-VERIFIED TOTALS (use these exact numbers):
+  const currentMonth = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  // Build text descriptions for AI to analyze (AI only generates narratives)
+  const stageDescription = dealsByStage.map(s => `${s.stage}: ${s.count} deals worth $${s.value.toFixed(2)}`).join(', ');
+  const ownerDescription = dealsByOwner.map(o => `${o.owner}: ${o.count} deals worth $${o.value.toFixed(2)}`).join(', ');
+
+  const prompt = `Analyze this HubSpot CRM data and write insights.
+
+VERIFIED DATA (these are facts):
 - Total Deals: ${dealCount}
 - Total Deal Value: $${totalDealValue.toFixed(2)}
+- Closed/Won Deals: ${closedWonDeals.length} worth $${closedWonValue.toFixed(2)}
+- Open Deals: ${openDeals.length} worth $${openDealsValue.toFixed(2)}
 - Total Contacts: ${contactCount}
 - Total Companies: ${companyCount}
-
-DEALS BY STAGE:
-${stageBreakdown || 'No stage data'}
-
-DEALS BY OWNER:
-${ownerBreakdown || 'No owner data'}
+- Deals by Stage: ${stageDescription || 'None'}
+- Deals by Owner: ${ownerDescription || 'None'}
 
 DEAL DETAILS:
 ${JSON.stringify(hubspotData.deals || [], null, 2)}
 
-CONTACT DETAILS (sample):
-${JSON.stringify((hubspotData.contacts || []).slice(0, 20), null, 2)}
+CONTACT DETAILS:
+${JSON.stringify((hubspotData.contacts || []).slice(0, 30), null, 2)}
 ${learnedContextPrompt}
 
-CRITICAL: Only use the numbers above. Do NOT invent metrics, projections, or data not present.
-
-Return JSON with this structure:
+Write ONLY the narrative insights. Return JSON with ONLY these fields:
 {
-  "title": "HubSpot CRM Report",
-  "subtitle": "Analysis of ${dealCount} deals and ${contactCount} contacts",
-  "dataSummary": {
-    "totalDeals": ${dealCount},
-    "totalContacts": ${contactCount},
-    "totalCompanies": ${companyCount},
-    "totalDealValue": ${totalDealValue}
-  },
-  "dealsByStage": [{ "stage": "...", "count": X, "value": Y }],
-  "dealsByOwner": [{ "owner": "...", "count": X, "value": Y }],
-  "dealAnalysis": ["insight 1", "insight 2"],
-  "contactAnalysis": ["insight 1", "insight 2"],
-  "recommendations": ["recommendation 1", "recommendation 2"]
-}`;
+  "revenueInsights": ["3-5 bullet points analyzing revenue/deals using the exact numbers above"],
+  "leadGenInsights": ["3-5 bullet points analyzing contacts/leads using the exact numbers above"],
+  "recommendations": ["3-5 actionable recommendations based on the data patterns"]
+}
+
+CRITICAL: Reference the exact numbers from the VERIFIED DATA. Do not invent any new statistics.`;
 
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',
     messages: [
       { 
         role: 'system', 
-        content: 'You are a data analyst. ONLY report facts from provided data. NEVER invent numbers. Return valid JSON only.' 
+        content: 'You are a marketing analyst. Write narrative insights referencing ONLY the provided numbers. Return valid JSON with only revenueInsights, leadGenInsights, and recommendations arrays.' 
       },
       { role: 'user', content: prompt }
     ],
-    temperature: 0.1,
+    temperature: 0.3,
     response_format: { type: 'json_object' },
   });
 
@@ -175,15 +185,31 @@ Return JSON with this structure:
     throw new Error('Failed to generate report');
   }
 
-  const reportData = JSON.parse(content);
+  const aiInsights = JSON.parse(content);
   
-  // Validate that the AI didn't hallucinate the key numbers
-  if (reportData.dataSummary) {
-    reportData.dataSummary.totalDeals = dealCount;
-    reportData.dataSummary.totalContacts = contactCount;
-    reportData.dataSummary.totalCompanies = companyCount;
-    reportData.dataSummary.totalDealValue = totalDealValue;
-  }
+  // BUILD REPORT WITH SERVER-VERIFIED DATA (AI only provides narratives)
+  const reportData = {
+    title: `${currentMonth} Report`,
+    subtitle: "Key Insights & Findings",
+    // ALL metrics come from server calculations, NOT from AI
+    verifiedData: {
+      totalDeals: dealCount,
+      totalContacts: contactCount,
+      totalCompanies: companyCount,
+      totalDealValue: totalDealValue,
+      closedWonDeals: closedWonDeals.length,
+      closedWonValue: closedWonValue,
+      openDeals: openDeals.length,
+      openDealsValue: openDealsValue
+    },
+    // Stage/owner breakdowns come from SERVER calculations
+    dealsByStage,
+    dealsByOwner,
+    // Only narrative text comes from AI (hallucination is tolerable here)
+    revenueInsights: aiInsights.revenueInsights || [],
+    leadGenInsights: aiInsights.leadGenInsights || [],
+    recommendations: aiInsights.recommendations || []
+  };
 
   return reportData;
 }
