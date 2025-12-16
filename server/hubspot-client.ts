@@ -44,7 +44,9 @@ export async function getDeals(apiKey: string, limit = 100) {
     'pipeline',
     'closedate',
     'createdate',
-    'hs_lastmodifieddate'
+    'hs_lastmodifieddate',
+    'hubspotownerId',
+    'hs_deal_stage_probability'
   ]);
   
   return response.results;
