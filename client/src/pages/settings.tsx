@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useLocation } from "wouter";
-import { api } from "@/lib/api";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   ArrowLeft,
   Plus,
@@ -17,7 +16,8 @@ import {
   BrainCircuit,
   Database,
   LogOut,
-  Menu
+  Menu,
+  RefreshCw
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -29,12 +29,20 @@ interface HubspotForm {
   createdAt: string;
 }
 
+interface AvailableForm {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
 export default function SettingsPage() {
   const { user, selectedAccount, selectedAccountName, logout } = useAuth();
   const [, setLocation] = useLocation();
-  const [forms, setForms] = useState<HubspotForm[]>([]);
-  const [formGuidInput, setFormGuidInput] = useState("");
+  const [savedForms, setSavedForms] = useState<HubspotForm[]>([]);
+  const [availableForms, setAvailableForms] = useState<AvailableForm[]>([]);
+  const [selectedFormId, setSelectedFormId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingAvailable, setIsLoadingAvailable] = useState(false);
   const [isAddingForm, setIsAddingForm] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { toast } = useToast();
@@ -45,6 +53,7 @@ export default function SettingsPage() {
       return;
     }
     loadForms();
+    loadAvailableForms();
   }, [user, selectedAccount, setLocation]);
 
   const loadForms = async () => {
@@ -54,7 +63,7 @@ export default function SettingsPage() {
       const response = await fetch(`/api/hubspot/forms/${selectedAccount}`);
       if (response.ok) {
         const data = await response.json();
-        setForms(data);
+        setSavedForms(data);
       }
     } catch (error) {
       console.error("Failed to load forms:", error);
@@ -63,8 +72,43 @@ export default function SettingsPage() {
     }
   };
 
+  const loadAvailableForms = async () => {
+    if (!selectedAccount) return;
+    setIsLoadingAvailable(true);
+    try {
+      const response = await fetch(`/api/hubspot/available-forms/${selectedAccount}`);
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableForms(data);
+      } else {
+        toast({
+          title: "Warning",
+          description: "Could not load forms from HubSpot. You may not have forms access.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Failed to load available forms:", error);
+    } finally {
+      setIsLoadingAvailable(false);
+    }
+  };
+
   const handleAddForm = async () => {
-    if (!formGuidInput.trim() || !selectedAccount) return;
+    if (!selectedFormId || !selectedAccount) return;
+    
+    const form = availableForms.find(f => f.id === selectedFormId);
+    if (!form) return;
+
+    // Check if already added
+    if (savedForms.some(f => f.formGuid === selectedFormId)) {
+      toast({
+        title: "Already Added",
+        description: "This form is already in your list.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     setIsAddingForm(true);
     try {
@@ -73,14 +117,14 @@ export default function SettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           accountId: selectedAccount,
-          formGuid: formGuidInput.trim()
+          formGuid: selectedFormId
         })
       });
 
       if (response.ok) {
         const newForm = await response.json();
-        setForms(prev => [newForm, ...prev]);
-        setFormGuidInput("");
+        setSavedForms(prev => [newForm, ...prev]);
+        setSelectedFormId("");
         toast({
           title: "Form Added",
           description: `"${newForm.formName}" has been added successfully.`
@@ -111,7 +155,7 @@ export default function SettingsPage() {
       });
 
       if (response.ok) {
-        setForms(prev => prev.filter(f => f.id !== formId));
+        setSavedForms(prev => prev.filter(f => f.id !== formId));
         toast({
           title: "Form Removed",
           description: `"${formName}" has been removed.`
@@ -131,6 +175,11 @@ export default function SettingsPage() {
       });
     }
   };
+
+  // Filter out already-added forms from the dropdown
+  const unaddedForms = availableForms.filter(
+    af => !savedForms.some(sf => sf.formGuid === af.id)
+  );
 
   const Sidebar = () => (
     <div className="h-full flex flex-col bg-sidebar border-r border-sidebar-border text-sidebar-foreground">
@@ -232,24 +281,52 @@ export default function SettingsPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">HubSpot Forms</CardTitle>
-                <CardDescription>
-                  Add form GUIDs to track form submissions in your reports. The form name will be automatically retrieved from HubSpot.
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">HubSpot Forms</CardTitle>
+                    <CardDescription>
+                      Select forms from your HubSpot account to track in reports.
+                    </CardDescription>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={loadAvailableForms}
+                    disabled={isLoadingAvailable}
+                    data-testid="button-refresh-forms"
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-2 ${isLoadingAvailable ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex gap-2">
-                  <Input
-                    placeholder="Enter form GUID (e.g., 4c8e2a9b-9a1c-4d4f-b7b5-9d9c3b2f8c01)"
-                    value={formGuidInput}
-                    onChange={(e) => setFormGuidInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleAddForm()}
-                    disabled={isAddingForm}
-                    data-testid="input-form-guid"
-                  />
+                  <Select 
+                    value={selectedFormId} 
+                    onValueChange={setSelectedFormId}
+                    disabled={isLoadingAvailable || isAddingForm}
+                  >
+                    <SelectTrigger className="flex-1" data-testid="select-form">
+                      <SelectValue placeholder={
+                        isLoadingAvailable 
+                          ? "Loading forms..." 
+                          : unaddedForms.length === 0 
+                            ? "All forms added" 
+                            : "Select a form"
+                      } />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {unaddedForms.map(form => (
+                        <SelectItem key={form.id} value={form.id}>
+                          {form.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Button 
                     onClick={handleAddForm} 
-                    disabled={!formGuidInput.trim() || isAddingForm}
+                    disabled={!selectedFormId || isAddingForm}
                     data-testid="button-add-form"
                   >
                     {isAddingForm ? (
@@ -264,15 +341,15 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                   </div>
-                ) : forms.length === 0 ? (
+                ) : savedForms.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
                     <p>No forms added yet</p>
-                    <p className="text-sm">Add a form GUID above to get started</p>
+                    <p className="text-sm">Select a form above to get started</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {forms.map((form) => (
+                    {savedForms.map((form) => (
                       <motion.div
                         key={form.id}
                         initial={{ opacity: 0, x: -10 }}

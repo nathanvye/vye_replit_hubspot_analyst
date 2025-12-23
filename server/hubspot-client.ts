@@ -264,6 +264,43 @@ export async function getCompanies(apiKey: string, maxRecords = PAGINATION_CONFI
   return companies;
 }
 
+// Fetch all forms from HubSpot
+export async function getAllForms(apiKey: string): Promise<{ id: string; name: string; createdAt: string }[]> {
+  const client = createHubSpotClient(apiKey);
+  const forms: { id: string; name: string; createdAt: string }[] = [];
+  
+  try {
+    let after: string | undefined;
+    
+    do {
+      const response: any = await client.apiRequest({
+        method: 'GET',
+        path: '/marketing/v3/forms',
+        qs: { limit: 100, ...(after ? { after } : {}) }
+      });
+      
+      const results = response.results || [];
+      for (const form of results) {
+        forms.push({
+          id: form.id,
+          name: form.name || 'Unnamed Form',
+          createdAt: form.createdAt || ''
+        });
+      }
+      
+      after = response.paging?.next?.after;
+    } while (after);
+    
+    // Sort by name
+    forms.sort((a, b) => a.name.localeCompare(b.name));
+    
+  } catch (error: any) {
+    console.error('Error fetching all forms:', error.body?.message || error.message);
+  }
+  
+  return forms;
+}
+
 // Look up a form by its GUID and return the form name
 export async function getFormByGuid(apiKey: string, formGuid: string): Promise<{ formGuid: string; name: string; error?: string } | { error: string }> {
   const client = createHubSpotClient(apiKey);

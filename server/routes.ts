@@ -8,7 +8,8 @@ import {
   searchDeals,
   validateApiKeyAndGetAccountInfo,
   getComprehensiveData,
-  getFormByGuid
+  getFormByGuid,
+  getAllForms
 } from "./hubspot-client";
 import { analyzeWithAI, generateReport, extractLearning } from "./ai-service";
 import { encrypt, decrypt } from "./encryption";
@@ -154,7 +155,25 @@ export async function registerRoutes(
   // HubSpot Forms Management
   // ==========================================
 
-  // Get forms for an account
+  // Get all available forms from HubSpot (for picker UI)
+  app.get("/api/hubspot/available-forms/:accountId", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      
+      const apiKey = await getApiKeyForAccount(accountId);
+      if (!apiKey) {
+        return res.status(400).json({ error: "Could not find API key for account" });
+      }
+
+      const forms = await getAllForms(apiKey);
+      res.json(forms);
+    } catch (error) {
+      console.error("Error fetching available forms:", error);
+      res.status(500).json({ error: "Failed to fetch available forms from HubSpot" });
+    }
+  });
+
+  // Get saved forms for an account
   app.get("/api/hubspot/forms/:accountId", async (req, res) => {
     try {
       const { accountId } = req.params;
