@@ -47,7 +47,7 @@ export default function DashboardPage() {
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>("chat");
+  const [viewMode, setViewMode] = useState<ViewMode>("report");
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -137,7 +137,7 @@ export default function DashboardPage() {
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              Connected & Syncing
+              Connected
             </div>
           </div>
         </div>
@@ -145,14 +145,6 @@ export default function DashboardPage() {
         <div>
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">Navigation</h3>
           <div className="space-y-1">
-            <Button 
-              variant={viewMode === "chat" ? "secondary" : "ghost"} 
-              className="w-full justify-start text-sm h-9"
-              onClick={() => { setViewMode("chat"); setIsSidebarOpen(false); }}
-            >
-              <MessageSquare className="w-4 h-4 mr-2" />
-              Chat Analysis
-            </Button>
             <Button 
               variant={viewMode === "report" ? "secondary" : "ghost"} 
               className="w-full justify-start text-sm h-9"
