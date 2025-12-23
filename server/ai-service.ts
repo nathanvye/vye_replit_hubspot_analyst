@@ -196,7 +196,8 @@ CRITICAL: Reference the exact numbers from VERIFIED DATA. Do not invent any new 
     contacts: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 },
     deals: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 },
     dealValue: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 },
-    companies: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 }
+    companies: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 },
+    websiteSessions: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 }
   };
 
   // BUILD REPORT WITH SERVER-VERIFIED DATA (AI only provides narratives)
@@ -214,13 +215,23 @@ CRITICAL: Reference the exact numbers from VERIFIED DATA. Do not invent any new 
       openDeals: openDeals.length,
       openDealsValue: openDealsValue
     },
-    // Quarterly KPI data for the table (SERVER calculated) - Only New Contacts for 2025
+    // Quarterly KPI data for the table (SERVER calculated)
     kpiTable: {
-      year: 2025,
+      year: new Date().getFullYear(),
       rows: [
         {
+          metric: "Website Sessions",
+          subtext: `Website sessions from HubSpot (${new Date().getFullYear()} only)`,
+          yearEndProjection: quarterly.websiteSessions.Q1 + quarterly.websiteSessions.Q2 + quarterly.websiteSessions.Q3 + quarterly.websiteSessions.Q4,
+          q1: { projection: '-', actual: quarterly.websiteSessions.Q1 },
+          q2: { projection: '-', actual: quarterly.websiteSessions.Q2 },
+          q3: { projection: '-', actual: quarterly.websiteSessions.Q3 },
+          q4: { projection: '-', actual: quarterly.websiteSessions.Q4 },
+          goal: ''
+        },
+        {
           metric: "New Contacts",
-          subtext: "Contacts created in HubSpot (2025 only)",
+          subtext: `Contacts created in HubSpot (${new Date().getFullYear()} only)`,
           yearEndProjection: quarterly.contacts.Q1 + quarterly.contacts.Q2 + quarterly.contacts.Q3 + quarterly.contacts.Q4,
           q1: { projection: '-', actual: quarterly.contacts.Q1 },
           q2: { projection: '-', actual: quarterly.contacts.Q2 },

@@ -617,6 +617,70 @@ export async function getContacts2025Quarterly(apiKey: string): Promise<{ Q1: nu
   return results;
 }
 
+// Get website sessions by quarter for the current year
+export async function getWebsiteSessionsQuarterly(apiKey: string): Promise<{ Q1: number; Q2: number; Q3: number; Q4: number; total: number }> {
+  const client = createHubSpotClient(apiKey);
+  const currentYear = new Date().getFullYear();
+  
+  // Define quarter boundaries for current year
+  const quarters = {
+    Q1: { start: `${currentYear}-01-01`, end: `${currentYear}-03-31` },
+    Q2: { start: `${currentYear}-04-01`, end: `${currentYear}-06-30` },
+    Q3: { start: `${currentYear}-07-01`, end: `${currentYear}-09-30` },
+    Q4: { start: `${currentYear}-10-01`, end: `${currentYear}-12-31` }
+  };
+  
+  const results = { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
+  
+  let quarterIndex = 0;
+  for (const [quarter, range] of Object.entries(quarters)) {
+    // Add delay between quarters to avoid rate limiting
+    if (quarterIndex > 0) {
+      await delay(1500);
+    }
+    quarterIndex++;
+    
+    try {
+      const httpResponse: any = await client.apiRequest({
+        method: 'POST',
+        path: '/analytics/v3/reports/traffic',
+        body: {
+          metrics: ["sessions"],
+          timeRange: {
+            start: range.start,
+            end: range.end
+          }
+        }
+      });
+      
+      // apiRequest returns a fetch Response object - need to parse JSON
+      const response = await httpResponse.json();
+      
+      // Sum up all session values in the response
+      let quarterSessions = 0;
+      if (response.results && Array.isArray(response.results)) {
+        for (const result of response.results) {
+          if (result.metric === 'sessions' && result.values && Array.isArray(result.values)) {
+            for (const value of result.values) {
+              quarterSessions += value.value || 0;
+            }
+          }
+        }
+      }
+      
+      results[quarter as keyof typeof results] = quarterSessions;
+      results.total += quarterSessions;
+      console.log(`${currentYear} ${quarter} website sessions: ${quarterSessions}`);
+    } catch (error: any) {
+      console.error(`Error fetching ${quarter} website sessions:`, error.body?.message || error.message);
+      // Continue with 0 for this quarter if there's an error
+    }
+  }
+  
+  console.log(`Total ${currentYear} website sessions: ${results.total}`);
+  return results;
+}
+
 // Get pipeline stages for mapping stage IDs to names
 export async function getPipelineStages(apiKey: string): Promise<Map<string, { label: string; probability: number }>> {
   const client = createHubSpotClient(apiKey);
@@ -647,13 +711,14 @@ export async function getPipelineStages(apiKey: string): Promise<Map<string, { l
 export async function getComprehensiveData(apiKey: string, maxRecords = PAGINATION_CONFIG.maxRecords) {
   console.log('Starting comprehensive data fetch with pagination...');
   
-  const [deals, contacts, companies, ownerMap, stageMap, contacts2025Quarterly] = await Promise.all([
+  const [deals, contacts, companies, ownerMap, stageMap, contacts2025Quarterly, websiteSessionsQuarterly] = await Promise.all([
     getDeals(apiKey, maxRecords).catch(e => { console.error('Deals fetch error:', e.body?.message || e.message); return []; }),
     getContacts(apiKey, maxRecords).catch(e => { console.error('Contacts fetch error:', e.body?.message || e.message); return []; }),
     getCompanies(apiKey, maxRecords).catch(e => { console.error('Companies fetch error:', e.body?.message || e.message); return []; }),
     getOwners(apiKey),
     getPipelineStages(apiKey),
-    getContacts2025Quarterly(apiKey).catch(e => { console.error('2025 contacts fetch error:', e.body?.message || e.message); return { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 }; })
+    getContacts2025Quarterly(apiKey).catch(e => { console.error('2025 contacts fetch error:', e.body?.message || e.message); return { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 }; }),
+    getWebsiteSessionsQuarterly(apiKey).catch(e => { console.error('Website sessions fetch error:', e.body?.message || e.message); return { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 }; })
   ]);
   
   console.log(`Comprehensive fetch complete: ${deals.length} deals, ${contacts.length} contacts, ${companies.length} companies, ${contacts2025Quarterly.total} contacts in 2025`);
@@ -793,7 +858,13 @@ export async function getComprehensiveData(apiKey: string, maxRecords = PAGINATI
         contacts: contactsByQuarter,
         deals: dealsByQuarter,
         dealValue: dealValueByQuarter,
-        companies: companiesByQuarter
+        companies: companiesByQuarter,
+        websiteSessions: {
+          Q1: websiteSessionsQuarterly.Q1,
+          Q2: websiteSessionsQuarterly.Q2,
+          Q3: websiteSessionsQuarterly.Q3,
+          Q4: websiteSessionsQuarterly.Q4
+        }
       }
     }
   };
