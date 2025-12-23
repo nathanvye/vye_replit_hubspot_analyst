@@ -9,7 +9,8 @@ import {
   validateApiKeyAndGetAccountInfo,
   getComprehensiveData,
   getFormByGuid,
-  getAllForms
+  getAllForms,
+  getFormSubmissions2025Quarterly
 } from "./hubspot-client";
 import { analyzeWithAI, generateReport, extractLearning } from "./ai-service";
 import { encrypt, decrypt } from "./encryption";
@@ -386,7 +387,32 @@ export async function registerRoutes(
       // Use comprehensive data with pre-calculated summaries
       const hubspotData = await getComprehensiveData(apiKey);
       const learnedContext = await storage.getLearnedContextByAccount(hubspotAccountId);
+      
+      // Fetch form submissions for saved forms
+      const savedForms = await storage.getFormsByAccount(hubspotAccountId);
+      const formSubmissionsData: Array<{
+        formName: string;
+        formGuid: string;
+        Q1: number;
+        Q2: number;
+        Q3: number;
+        Q4: number;
+        total: number;
+      }> = [];
+      
+      for (const form of savedForms) {
+        const submissions = await getFormSubmissions2025Quarterly(apiKey, form.formGuid);
+        formSubmissionsData.push({
+          formName: form.formName,
+          formGuid: form.formGuid,
+          ...submissions
+        });
+      }
+      
       const reportData = await generateReport(hubspotData, learnedContext);
+      
+      // Add form submissions to report data
+      (reportData as any).formSubmissions = formSubmissionsData;
 
       const report = await storage.createReport({
         conversationId: conversationId || null,

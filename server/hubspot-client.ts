@@ -390,6 +390,84 @@ export async function getFormSubmissions(apiKey: string, limit = 50): Promise<an
   return submissions;
 }
 
+// Get form submissions for 2025 with quarterly breakdown
+export async function getFormSubmissions2025Quarterly(
+  apiKey: string, 
+  formGuid: string
+): Promise<{ Q1: number; Q2: number; Q3: number; Q4: number; total: number }> {
+  const client = createHubSpotClient(apiKey);
+  
+  // Jan 1, 2025 UTC timestamp in milliseconds
+  const jan1_2025 = Date.UTC(2025, 0, 1);
+  
+  // Quarter boundaries for 2025 (UTC timestamps in milliseconds)
+  const quarters = {
+    Q1: { start: Date.UTC(2025, 0, 1), end: Date.UTC(2025, 3, 1) },   // Jan 1 - Mar 31
+    Q2: { start: Date.UTC(2025, 3, 1), end: Date.UTC(2025, 6, 1) },   // Apr 1 - Jun 30
+    Q3: { start: Date.UTC(2025, 6, 1), end: Date.UTC(2025, 9, 1) },   // Jul 1 - Sep 30
+    Q4: { start: Date.UTC(2025, 9, 1), end: Date.UTC(2026, 0, 1) }    // Oct 1 - Dec 31
+  };
+  
+  const results = { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
+  
+  try {
+    let offset = 0;
+    let hasMore = true;
+    const allSubmissions: { submittedAt: number }[] = [];
+    
+    // Paginate through all submissions for 2025
+    while (hasMore) {
+      const httpResponse: any = await client.apiRequest({
+        method: 'GET',
+        path: `/form-integrations/v1/submissions/forms/${formGuid}`,
+        qs: { 
+          limit: 50,
+          after: offset > 0 ? offset : undefined,
+          'submittedAt__gte': jan1_2025
+        }
+      });
+      
+      const response = await httpResponse.json();
+      const submissions = response.results || [];
+      
+      for (const sub of submissions) {
+        allSubmissions.push({ submittedAt: sub.submittedAt });
+      }
+      
+      hasMore = response.hasMore === true;
+      offset = response.offset || (offset + submissions.length);
+      
+      // Safety cap
+      if (allSubmissions.length >= 5000) {
+        console.log(`Form ${formGuid}: reached 5000 submissions, stopping`);
+        break;
+      }
+    }
+    
+    // Count submissions by quarter
+    for (const sub of allSubmissions) {
+      const ts = sub.submittedAt;
+      if (ts >= quarters.Q1.start && ts < quarters.Q1.end) {
+        results.Q1++;
+      } else if (ts >= quarters.Q2.start && ts < quarters.Q2.end) {
+        results.Q2++;
+      } else if (ts >= quarters.Q3.start && ts < quarters.Q3.end) {
+        results.Q3++;
+      } else if (ts >= quarters.Q4.start && ts < quarters.Q4.end) {
+        results.Q4++;
+      }
+    }
+    
+    results.total = results.Q1 + results.Q2 + results.Q3 + results.Q4;
+    console.log(`Form ${formGuid}: Q1=${results.Q1}, Q2=${results.Q2}, Q3=${results.Q3}, Q4=${results.Q4}, Total=${results.total}`);
+    
+  } catch (error: any) {
+    console.error(`Error fetching form submissions for ${formGuid}:`, error.body?.message || error.message);
+  }
+  
+  return results;
+}
+
 // Search deals with filters
 export async function searchDeals(apiKey: string, filters: any) {
   const client = createHubSpotClient(apiKey);
