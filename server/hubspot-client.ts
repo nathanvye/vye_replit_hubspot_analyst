@@ -326,6 +326,65 @@ export async function searchDeals(apiKey: string, filters: any) {
   return response.results;
 }
 
+// Get contacts created in 2025 with quarterly breakdown using search API
+export async function getContacts2025Quarterly(apiKey: string): Promise<{ Q1: number; Q2: number; Q3: number; Q4: number; total: number }> {
+  const client = createHubSpotClient(apiKey);
+  
+  // Define quarter boundaries for 2025 (UTC timestamps in milliseconds)
+  const quarters = {
+    Q1: { start: Date.UTC(2025, 0, 1), end: Date.UTC(2025, 3, 1) },   // Jan 1 - Mar 31
+    Q2: { start: Date.UTC(2025, 3, 1), end: Date.UTC(2025, 6, 1) },   // Apr 1 - Jun 30
+    Q3: { start: Date.UTC(2025, 6, 1), end: Date.UTC(2025, 9, 1) },   // Jul 1 - Sep 30
+    Q4: { start: Date.UTC(2025, 9, 1), end: Date.UTC(2026, 0, 1) }    // Oct 1 - Dec 31
+  };
+  
+  const results = { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
+  
+  // Fetch counts for each quarter using search API
+  for (const [quarter, range] of Object.entries(quarters)) {
+    try {
+      let after: string | undefined = undefined;
+      let quarterCount = 0;
+      
+      // Paginate through all contacts in this quarter
+      while (true) {
+        const searchRequest: any = {
+          filterGroups: [{
+            filters: [
+              { propertyName: 'createdate', operator: 'GTE', value: range.start.toString() },
+              { propertyName: 'createdate', operator: 'LT', value: range.end.toString() }
+            ]
+          }],
+          properties: ['createdate'],
+          limit: 100,
+          after
+        };
+        
+        const response = await client.crm.contacts.searchApi.doSearch(searchRequest);
+        quarterCount += response.results.length;
+        
+        if (!response.paging?.next?.after) break;
+        after = response.paging.next.after;
+        
+        // Safety cap per quarter
+        if (quarterCount >= 10000) {
+          console.log(`Quarter ${quarter} reached 10000 contacts, stopping`);
+          break;
+        }
+      }
+      
+      results[quarter as keyof typeof results] = quarterCount;
+      results.total += quarterCount;
+      console.log(`2025 ${quarter}: ${quarterCount} contacts`);
+    } catch (error: any) {
+      console.error(`Error fetching ${quarter} contacts:`, error.body?.message || error.message);
+    }
+  }
+  
+  console.log(`Total 2025 contacts: ${results.total}`);
+  return results;
+}
+
 // Get pipeline stages for mapping stage IDs to names
 export async function getPipelineStages(apiKey: string): Promise<Map<string, { label: string; probability: number }>> {
   const client = createHubSpotClient(apiKey);
@@ -356,15 +415,16 @@ export async function getPipelineStages(apiKey: string): Promise<Map<string, { l
 export async function getComprehensiveData(apiKey: string, maxRecords = PAGINATION_CONFIG.maxRecords) {
   console.log('Starting comprehensive data fetch with pagination...');
   
-  const [deals, contacts, companies, ownerMap, stageMap] = await Promise.all([
+  const [deals, contacts, companies, ownerMap, stageMap, contacts2025Quarterly] = await Promise.all([
     getDeals(apiKey, maxRecords).catch(e => { console.error('Deals fetch error:', e.body?.message || e.message); return []; }),
     getContacts(apiKey, maxRecords).catch(e => { console.error('Contacts fetch error:', e.body?.message || e.message); return []; }),
     getCompanies(apiKey, maxRecords).catch(e => { console.error('Companies fetch error:', e.body?.message || e.message); return []; }),
     getOwners(apiKey),
-    getPipelineStages(apiKey)
+    getPipelineStages(apiKey),
+    getContacts2025Quarterly(apiKey).catch(e => { console.error('2025 contacts fetch error:', e.body?.message || e.message); return { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 }; })
   ]);
   
-  console.log(`Comprehensive fetch complete: ${deals.length} deals, ${contacts.length} contacts, ${companies.length} companies`);
+  console.log(`Comprehensive fetch complete: ${deals.length} deals, ${contacts.length} contacts, ${companies.length} companies, ${contacts2025Quarterly.total} contacts in 2025`);
   
   // Enrich deals with owner names and stage labels
   const enrichedDeals = deals.map(deal => {
@@ -458,12 +518,13 @@ export async function getComprehensiveData(apiKey: string, maxRecords = PAGINATI
     return 'Q4';
   };
 
-  // Contacts by quarter (based on create date)
-  const contactsByQuarter = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
-  for (const contact of enrichedContacts) {
-    const q = getQuarter(contact.createDate);
-    if (q) contactsByQuarter[q]++;
-  }
+  // Use 2025 quarterly contacts from search API (accurate server-side filtering)
+  const contactsByQuarter = {
+    Q1: contacts2025Quarterly.Q1,
+    Q2: contacts2025Quarterly.Q2,
+    Q3: contacts2025Quarterly.Q3,
+    Q4: contacts2025Quarterly.Q4
+  };
 
   // Deals by quarter (based on create date)
   const dealsByQuarter = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 };

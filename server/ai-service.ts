@@ -214,48 +214,18 @@ CRITICAL: Reference the exact numbers from VERIFIED DATA. Do not invent any new 
       openDeals: openDeals.length,
       openDealsValue: openDealsValue
     },
-    // Quarterly KPI data for the table (SERVER calculated)
+    // Quarterly KPI data for the table (SERVER calculated) - Only New Contacts for 2025
     kpiTable: {
-      year: quarterly.year,
+      year: 2025,
       rows: [
         {
           metric: "New Contacts",
-          subtext: "Contacts created in HubSpot",
-          yearEndProjection: contactCount,
-          q1: { projection: '-', actual: quarterly.contacts.Q1 || null },
-          q2: { projection: '-', actual: quarterly.contacts.Q2 || null },
-          q3: { projection: '-', actual: quarterly.contacts.Q3 || null },
-          q4: { projection: '-', actual: quarterly.contacts.Q4 || null },
-          goal: ''
-        },
-        {
-          metric: "New Deals",
-          subtext: "Deals created in pipeline",
-          yearEndProjection: dealCount,
-          q1: { projection: '-', actual: quarterly.deals.Q1 || null },
-          q2: { projection: '-', actual: quarterly.deals.Q2 || null },
-          q3: { projection: '-', actual: quarterly.deals.Q3 || null },
-          q4: { projection: '-', actual: quarterly.deals.Q4 || null },
-          goal: ''
-        },
-        {
-          metric: "Deal Value ($)",
-          subtext: "Total pipeline value",
-          yearEndProjection: totalDealValue,
-          q1: { projection: '-', actual: quarterly.dealValue.Q1 || null },
-          q2: { projection: '-', actual: quarterly.dealValue.Q2 || null },
-          q3: { projection: '-', actual: quarterly.dealValue.Q3 || null },
-          q4: { projection: '-', actual: quarterly.dealValue.Q4 || null },
-          goal: ''
-        },
-        {
-          metric: "New Companies",
-          subtext: "Companies added",
-          yearEndProjection: companyCount,
-          q1: { projection: '-', actual: quarterly.companies.Q1 || null },
-          q2: { projection: '-', actual: quarterly.companies.Q2 || null },
-          q3: { projection: '-', actual: quarterly.companies.Q3 || null },
-          q4: { projection: '-', actual: quarterly.companies.Q4 || null },
+          subtext: "Contacts created in HubSpot (2025 only)",
+          yearEndProjection: quarterly.contacts.Q1 + quarterly.contacts.Q2 + quarterly.contacts.Q3 + quarterly.contacts.Q4,
+          q1: { projection: '-', actual: quarterly.contacts.Q1 },
+          q2: { projection: '-', actual: quarterly.contacts.Q2 },
+          q3: { projection: '-', actual: quarterly.contacts.Q3 },
+          q4: { projection: '-', actual: quarterly.contacts.Q4 },
           goal: ''
         }
       ]
