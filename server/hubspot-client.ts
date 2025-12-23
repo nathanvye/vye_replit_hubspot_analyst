@@ -496,6 +496,9 @@ export async function searchDeals(apiKey: string, filters: any) {
   return response.results;
 }
 
+// Helper to delay execution
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 // Get contacts created in 2025 with quarterly breakdown using search API
 export async function getContacts2025Quarterly(apiKey: string): Promise<{ Q1: number; Q2: number; Q3: number; Q4: number; total: number }> {
   const client = createHubSpotClient(apiKey);
@@ -511,13 +514,27 @@ export async function getContacts2025Quarterly(apiKey: string): Promise<{ Q1: nu
   const results = { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
   
   // Fetch counts for each quarter using search API
+  let quarterIndex = 0;
   for (const [quarter, range] of Object.entries(quarters)) {
+    // Add delay between quarters to avoid rate limiting
+    if (quarterIndex > 0) {
+      await delay(1500); // 1.5 second delay between quarters
+    }
+    quarterIndex++;
+    
     try {
       let after: string | undefined = undefined;
       let quarterCount = 0;
+      let pageCount = 0;
       
       // Paginate through all contacts in this quarter
       while (true) {
+        // Add small delay between pages to avoid rate limits
+        if (pageCount > 0 && pageCount % 5 === 0) {
+          await delay(500); // 0.5 second delay every 5 pages
+        }
+        pageCount++;
+        
         const searchRequest: any = {
           filterGroups: [{
             filters: [
@@ -551,6 +568,48 @@ export async function getContacts2025Quarterly(apiKey: string): Promise<{ Q1: nu
       console.log(`2025 ${quarter}: ${quarterCount} contacts`);
     } catch (error: any) {
       console.error(`Error fetching ${quarter} contacts:`, error.body?.message || error.message);
+      // Retry once after a longer delay if rate limited
+      if (error.body?.message?.includes('limit') || error.message?.includes('limit')) {
+        console.log(`Retrying ${quarter} after rate limit delay...`);
+        await delay(3000);
+        try {
+          let after: string | undefined = undefined;
+          let quarterCount = 0;
+          
+          while (true) {
+            await delay(300); // Slow down for retry
+            
+            const searchRequest: any = {
+              filterGroups: [{
+                filters: [
+                  { propertyName: 'createdate', operator: 'GTE', value: range.start },
+                  { propertyName: 'createdate', operator: 'LT', value: range.end }
+                ]
+              }],
+              properties: ['createdate'],
+              limit: 100
+            };
+            
+            if (after) {
+              searchRequest.after = after;
+            }
+            
+            const response = await client.crm.contacts.searchApi.doSearch(searchRequest);
+            quarterCount += response.results?.length || 0;
+            
+            if (!response.paging?.next?.after) break;
+            after = response.paging.next.after;
+            
+            if (quarterCount >= 10000) break;
+          }
+          
+          results[quarter as keyof typeof results] = quarterCount;
+          results.total += quarterCount;
+          console.log(`2025 ${quarter} (retry): ${quarterCount} contacts`);
+        } catch (retryError: any) {
+          console.error(`Retry failed for ${quarter}:`, retryError.body?.message || retryError.message);
+        }
+      }
     }
   }
   
