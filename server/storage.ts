@@ -7,7 +7,8 @@ import type {
   InsertConversation, Conversation,
   InsertMessage, Message,
   InsertLearnedContext, LearnedContext,
-  InsertReport, Report
+  InsertReport, Report,
+  InsertHubspotForm, HubspotForm
 } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 
@@ -49,6 +50,11 @@ export interface IStorage {
   // Reports
   getReportsByAccount(hubspotAccountId: string): Promise<Report[]>;
   createReport(report: InsertReport): Promise<Report>;
+  
+  // HubSpot Forms
+  getFormsByAccount(hubspotAccountId: string): Promise<HubspotForm[]>;
+  createForm(form: InsertHubspotForm): Promise<HubspotForm>;
+  deleteForm(id: string): Promise<void>;
 }
 
 class Storage implements IStorage {
@@ -162,6 +168,23 @@ class Storage implements IStorage {
   async createReport(report: InsertReport): Promise<Report> {
     const result = await db.insert(schema.reports).values(report).returning();
     return result[0];
+  }
+
+  // HubSpot Forms
+  async getFormsByAccount(hubspotAccountId: string): Promise<HubspotForm[]> {
+    return await db.select()
+      .from(schema.hubspotForms)
+      .where(eq(schema.hubspotForms.hubspotAccountId, hubspotAccountId))
+      .orderBy(desc(schema.hubspotForms.createdAt));
+  }
+
+  async createForm(form: InsertHubspotForm): Promise<HubspotForm> {
+    const result = await db.insert(schema.hubspotForms).values(form).returning();
+    return result[0];
+  }
+
+  async deleteForm(id: string): Promise<void> {
+    await db.delete(schema.hubspotForms).where(eq(schema.hubspotForms.id, id));
   }
 }
 

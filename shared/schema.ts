@@ -103,3 +103,19 @@ export const insertReportSchema = createInsertSchema(reports).omit({
 });
 export type InsertReport = z.infer<typeof insertReportSchema>;
 export type Report = typeof reports.$inferSelect;
+
+// HubSpot Forms - stores form GUIDs and names for report tracking
+export const hubspotForms = pgTable("hubspot_forms", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  hubspotAccountId: varchar("hubspot_account_id").notNull().references(() => hubspotAccounts.id, { onDelete: "cascade" }),
+  formGuid: text("form_guid").notNull(),
+  formName: text("form_name").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertHubspotFormSchema = createInsertSchema(hubspotForms).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type InsertHubspotForm = z.infer<typeof insertHubspotFormSchema>;
+export type HubspotForm = typeof hubspotForms.$inferSelect;
