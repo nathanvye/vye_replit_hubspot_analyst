@@ -496,7 +496,7 @@ export async function searchDeals(apiKey: string, filters: any) {
   return response.results;
 }
 
-// Get contacts created in 2025 with quarterly breakdown using search API
+// Get contacts created in 2025 with quarterly breakdown
 export async function getContacts2025Quarterly(apiKey: string): Promise<{ Q1: number; Q2: number; Q3: number; Q4: number; total: number }> {
   const client = createHubSpotClient(apiKey);
   
@@ -508,50 +508,84 @@ export async function getContacts2025Quarterly(apiKey: string): Promise<{ Q1: nu
     Q4: { start: Date.UTC(2025, 9, 1), end: Date.UTC(2026, 0, 1) }    // Oct 1 - Dec 31
   };
   
+  const jan1_2025 = quarters.Q1.start;
+  const jan1_2026 = quarters.Q4.end;
+  
   const results = { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
   
-  // Fetch counts for each quarter using search API
-  for (const [quarter, range] of Object.entries(quarters)) {
-    try {
-      let after: string | undefined = undefined;
-      let quarterCount = 0;
+  try {
+    let after: string | undefined = undefined;
+    let totalFetched = 0;
+    let foundOlderThan2025 = false;
+    
+    // Paginate through all contacts (no date filter to ensure we get everything)
+    while (!foundOlderThan2025) {
+      const pageConfig: any = {
+        limit: 100,
+        properties: ['createdate']
+      };
       
-      // Paginate through all contacts in this quarter
-      while (true) {
-        const searchRequest: any = {
-          filterGroups: [{
-            filters: [
-              { propertyName: 'createdate', operator: 'GTE', value: range.start.toString() },
-              { propertyName: 'createdate', operator: 'LT', value: range.end.toString() }
-            ]
-          }],
-          properties: ['createdate'],
-          limit: 100,
-          after
-        };
+      if (after) {
+        pageConfig.after = after;
+      }
+      
+      const response = await client.crm.contacts.basicApi.getPage(
+        pageConfig.limit,
+        after,
+        pageConfig.properties
+      );
+      
+      const contacts = response.results || [];
+      if (contacts.length === 0) break;
+      
+      for (const contact of contacts) {
+        const createDateStr = contact.properties?.createdate;
+        if (!createDateStr) continue;
         
-        const response = await client.crm.contacts.searchApi.doSearch(searchRequest);
-        quarterCount += response.results.length;
+        const ts = parseInt(createDateStr, 10);
+        if (isNaN(ts)) continue;
         
-        if (!response.paging?.next?.after) break;
-        after = response.paging.next.after;
+        // Skip future submissions (shouldn't happen but be safe)
+        if (ts >= jan1_2026) continue;
         
-        // Safety cap per quarter
-        if (quarterCount >= 10000) {
-          console.log(`Quarter ${quarter} reached 10000 contacts, stopping`);
+        // If we've gone past 2025, we can stop paginating
+        if (ts < jan1_2025) {
+          foundOlderThan2025 = true;
           break;
+        }
+        
+        // Count by quarter
+        if (ts >= quarters.Q1.start && ts < quarters.Q1.end) {
+          results.Q1++;
+        } else if (ts >= quarters.Q2.start && ts < quarters.Q2.end) {
+          results.Q2++;
+        } else if (ts >= quarters.Q3.start && ts < quarters.Q3.end) {
+          results.Q3++;
+        } else if (ts >= quarters.Q4.start && ts < quarters.Q4.end) {
+          results.Q4++;
         }
       }
       
-      results[quarter as keyof typeof results] = quarterCount;
-      results.total += quarterCount;
-      console.log(`2025 ${quarter}: ${quarterCount} contacts`);
-    } catch (error: any) {
-      console.error(`Error fetching ${quarter} contacts:`, error.body?.message || error.message);
+      totalFetched += contacts.length;
+      
+      // Check for next page
+      after = response.paging?.next?.after;
+      if (!after) break;
+      
+      // Safety cap
+      if (totalFetched >= 50000) {
+        console.log(`Contacts: reached 50000 total contacts, stopping`);
+        break;
+      }
     }
+    
+    results.total = results.Q1 + results.Q2 + results.Q3 + results.Q4;
+    console.log(`2025 Contacts: Q1=${results.Q1}, Q2=${results.Q2}, Q3=${results.Q3}, Q4=${results.Q4}, Total=${results.total}`);
+    
+  } catch (error: any) {
+    console.error(`Error fetching 2025 contacts:`, error.body?.message || error.message);
   }
   
-  console.log(`Total 2025 contacts: ${results.total}`);
   return results;
 }
 
