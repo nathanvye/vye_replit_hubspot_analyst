@@ -6,10 +6,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Download, RefreshCw, AlertCircle, ExternalLink } from "lucide-react";
 import { motion } from "framer-motion";
+import { KPITable } from "./KPITable";
+import { cn } from "@/lib/utils";
 
-interface KPIMetric {
+interface KPIRow {
   metric: string;
-  value: number | string;
+  subtext?: string;
+  yoyChange?: string;
+  yearEndProjection: number | string;
+  q1: { projection: number | string; actual: number | string | null };
+  q2: { projection: number | string; actual: number | string | null };
+  q3: { projection: number | string; actual: number | string | null };
+  q4: { projection: number | string; actual: number | string | null };
+  goal: number | string;
 }
 
 interface StageData {
@@ -18,18 +27,15 @@ interface StageData {
   value: number;
 }
 
-interface OwnerData {
-  owner: string;
-  count: number;
-  value: number;
-}
-
 interface ReportData {
   title: string;
   subtitle: string;
-  kpiMetrics?: KPIMetric[];
+  kpiTable?: {
+    year: number;
+    rows: KPIRow[];
+  };
   dealsByStage?: StageData[];
-  dealsByOwner?: OwnerData[];
+  dealsByOwner?: { owner: string; count: number; value: number }[];
   revenueInsights?: string[];
   leadGenInsights?: string[];
   recommendations?: string[];
@@ -84,12 +90,6 @@ export function ReportView() {
     }).format(num);
   };
 
-  const formatNumber = (value: number | string) => {
-    const num = typeof value === 'string' ? parseFloat(value) : value;
-    return new Intl.NumberFormat('en-US').format(num);
-  };
-
-  // Show generate button if no report
   if (!report) {
     return (
       <div className="w-full max-w-3xl mx-auto p-6 md:p-10">
@@ -137,7 +137,7 @@ export function ReportView() {
   const verified = report.verifiedData;
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-8 p-6 md:p-10 animate-in-up">
+    <div className="w-full max-w-6xl mx-auto space-y-8 p-6 md:p-10 animate-in-up">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-border pb-6">
         <div>
@@ -160,99 +160,72 @@ export function ReportView() {
         </div>
       </div>
 
-      {/* KPI Performance Section */}
+      {/* KPI Performance Table */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-primary">KPI Performance</h2>
-          <div className="flex gap-4 text-sm text-primary underline cursor-pointer">
+          <h2 className="text-xl font-semibold text-[#5C3D5E]">KPI Performance:</h2>
+          <div className="flex gap-4 text-sm text-[#5C3D5E] underline cursor-pointer">
             <span className="flex items-center gap-1">
               <ExternalLink className="w-3 h-3" /> HubSpot Reporting Dashboard
             </span>
           </div>
         </div>
 
-        <Card className="overflow-hidden border-border/60 shadow-sm">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50 hover:bg-muted/50">
-                  <TableHead className="font-bold text-foreground">Metric</TableHead>
-                  <TableHead className="text-right font-bold">Value</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {verified && (
-                  <>
-                    <TableRow>
-                      <TableCell className="font-medium">Total Deals</TableCell>
-                      <TableCell className="text-right font-mono font-bold text-primary">{verified.totalDeals}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Total Deal Value</TableCell>
-                      <TableCell className="text-right font-mono font-bold text-green-600">{formatCurrency(verified.totalDealValue)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Closed Won Deals</TableCell>
-                      <TableCell className="text-right font-mono">{verified.closedWonDeals}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Closed Won Value</TableCell>
-                      <TableCell className="text-right font-mono text-green-600">{formatCurrency(verified.closedWonValue)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Open Deals</TableCell>
-                      <TableCell className="text-right font-mono">{verified.openDeals}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Open Pipeline Value</TableCell>
-                      <TableCell className="text-right font-mono text-orange-500">{formatCurrency(verified.openDealsValue)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Total Contacts</TableCell>
-                      <TableCell className="text-right font-mono">{verified.totalContacts}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Total Companies</TableCell>
-                      <TableCell className="text-right font-mono">{verified.totalCompanies}</TableCell>
-                    </TableRow>
-                  </>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
+        {report.kpiTable && report.kpiTable.rows.length > 0 ? (
+          <KPITable rows={report.kpiTable.rows} year={report.kpiTable.year} />
+        ) : verified && (
+          <Card className="overflow-hidden border-border/60 shadow-sm">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-[#5C3D5E] hover:bg-[#5C3D5E]">
+                    <TableHead className="font-bold text-white">Metric</TableHead>
+                    <TableHead className="text-right font-bold text-white">Value</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell className="font-medium">Total Deals</TableCell>
+                    <TableCell className="text-right font-mono font-bold text-[#5C3D5E]">{verified.totalDeals}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Total Deal Value</TableCell>
+                    <TableCell className="text-right font-mono font-bold text-green-600">{formatCurrency(verified.totalDealValue)}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Closed Won Deals</TableCell>
+                    <TableCell className="text-right font-mono">{verified.closedWonDeals}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Closed Won Value</TableCell>
+                    <TableCell className="text-right font-mono text-green-600">{formatCurrency(verified.closedWonValue)}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Open Deals</TableCell>
+                    <TableCell className="text-right font-mono">{verified.openDeals}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Open Pipeline Value</TableCell>
+                    <TableCell className="text-right font-mono text-orange-500">{formatCurrency(verified.openDealsValue)}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Total Contacts</TableCell>
+                    <TableCell className="text-right font-mono">{verified.totalContacts}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Total Companies</TableCell>
+                    <TableCell className="text-right font-mono">{verified.totalCompanies}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        )}
       </section>
 
-      {/* Deals by Stage */}
-      {report.dealsByStage && report.dealsByStage.length > 0 && (
-        <section className="space-y-4">
-          <h2 className="text-xl font-semibold text-primary">Deals by Stage</h2>
-          <Card className="overflow-hidden border-border/60 shadow-sm">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="font-bold">Stage</TableHead>
-                  <TableHead className="text-right">Count</TableHead>
-                  <TableHead className="text-right">Value</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {report.dealsByStage.map((row, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="font-medium">{row.stage}</TableCell>
-                    <TableCell className="text-right">{row.count}</TableCell>
-                    <TableCell className="text-right font-mono">{formatCurrency(row.value)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-        </section>
-      )}
-
-      {/* Insights Section - Matches the user's format */}
+      {/* Insights Section */}
       <section className="space-y-6">
-        <h2 className="text-2xl font-bold text-primary border-b border-primary pb-2">Insights:</h2>
+        <h2 className="text-2xl font-bold text-[#5C3D5E] border-b-2 border-[#5C3D5E] pb-2">Insights:</h2>
         
         {/* Revenue Generation */}
         {report.revenueInsights && report.revenueInsights.length > 0 && (
@@ -262,12 +235,12 @@ export function ReportView() {
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
           >
-            <Card className="border-l-4 border-l-purple-500 shadow-md">
+            <Card className="border-l-4 border-l-[#5C3D5E] shadow-md">
               <CardHeader className="pb-2">
-                <CardTitle className="text-purple-600 dark:text-purple-400 text-lg">Revenue Generation:</CardTitle>
+                <CardTitle className="text-[#5C3D5E] text-lg">Revenue Generation:</CardTitle>
               </CardHeader>
               <CardContent>
-                <ul className="list-disc pl-5 space-y-2 text-sm text-foreground marker:text-purple-500">
+                <ul className="list-disc pl-5 space-y-2 text-sm text-foreground marker:text-[#5C3D5E]">
                   {report.revenueInsights.map((insight, i) => (
                     <li key={i} className="leading-relaxed">{insight}</li>
                   ))}
@@ -285,12 +258,12 @@ export function ReportView() {
             viewport={{ once: true }}
             transition={{ delay: 0.2 }}
           >
-            <Card className="border-l-4 border-l-blue-500 shadow-md">
+            <Card className="border-l-4 border-l-[#5C3D5E] shadow-md">
               <CardHeader className="pb-2">
-                <CardTitle className="text-blue-600 dark:text-blue-400 text-lg">Lead Gen & Nurturing:</CardTitle>
+                <CardTitle className="text-[#5C3D5E] text-lg">Lead Gen & Nurturing:</CardTitle>
               </CardHeader>
               <CardContent>
-                <ul className="list-disc pl-5 space-y-2 text-sm text-foreground marker:text-blue-500">
+                <ul className="list-disc pl-5 space-y-2 text-sm text-foreground marker:text-[#5C3D5E]">
                   {report.leadGenInsights.map((insight, i) => (
                     <li key={i} className="leading-relaxed">{insight}</li>
                   ))}
@@ -310,10 +283,10 @@ export function ReportView() {
           viewport={{ once: true }}
           transition={{ delay: 0.3 }}
         >
-          <h2 className="text-2xl font-bold text-destructive border-b border-destructive pb-2">Recommendations:</h2>
-          <Card className="bg-destructive/5 border-destructive/20">
+          <h2 className="text-2xl font-bold text-red-700 border-b-2 border-red-700 pb-2">Recommendations:</h2>
+          <Card className="bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800">
             <CardContent className="pt-6">
-              <ul className="list-disc pl-5 space-y-3">
+              <ul className="list-disc pl-5 space-y-3 marker:text-red-700">
                 {report.recommendations.map((rec, i) => (
                   <li key={i} className="text-sm leading-relaxed text-foreground">
                     {rec}

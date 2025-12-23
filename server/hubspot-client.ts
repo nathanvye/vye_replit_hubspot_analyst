@@ -346,6 +346,44 @@ export async function getComprehensiveData(apiKey: string) {
     stageSummary[stage].totalValue += deal.amount;
   }
   
+  // Calculate quarterly breakdowns for 2025
+  const currentYear = new Date().getFullYear();
+  const getQuarter = (dateStr: string | null) => {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    if (date.getFullYear() !== currentYear) return null;
+    const month = date.getMonth();
+    if (month < 3) return 'Q1';
+    if (month < 6) return 'Q2';
+    if (month < 9) return 'Q3';
+    return 'Q4';
+  };
+
+  // Contacts by quarter (based on create date)
+  const contactsByQuarter = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
+  for (const contact of enrichedContacts) {
+    const q = getQuarter(contact.createDate);
+    if (q) contactsByQuarter[q]++;
+  }
+
+  // Deals by quarter (based on create date)
+  const dealsByQuarter = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
+  const dealValueByQuarter = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
+  for (const deal of enrichedDeals) {
+    const q = getQuarter(deal.createDate);
+    if (q) {
+      dealsByQuarter[q]++;
+      dealValueByQuarter[q] += deal.amount;
+    }
+  }
+
+  // Companies by quarter
+  const companiesByQuarter = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
+  for (const company of enrichedCompanies) {
+    const q = getQuarter(company.createDate);
+    if (q) companiesByQuarter[q]++;
+  }
+
   return {
     deals: enrichedDeals,
     contacts: enrichedContacts,
@@ -357,7 +395,14 @@ export async function getComprehensiveData(apiKey: string) {
       totalCompanies: enrichedCompanies.length,
       byOwner: ownerSummary,
       byStage: stageSummary,
-      owners: Array.from(ownerMap.entries()).map(([id, name]) => ({ id, name }))
+      owners: Array.from(ownerMap.entries()).map(([id, name]) => ({ id, name })),
+      quarterly: {
+        year: currentYear,
+        contacts: contactsByQuarter,
+        deals: dealsByQuarter,
+        dealValue: dealValueByQuarter,
+        companies: companiesByQuarter
+      }
     }
   };
 }

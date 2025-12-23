@@ -187,6 +187,15 @@ CRITICAL: Reference the exact numbers from the VERIFIED DATA. Do not invent any 
 
   const aiInsights = JSON.parse(content);
   
+  // Get quarterly data from summary
+  const quarterly = summary.quarterly || { 
+    year: new Date().getFullYear(),
+    contacts: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 },
+    deals: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 },
+    dealValue: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 },
+    companies: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 }
+  };
+
   // BUILD REPORT WITH SERVER-VERIFIED DATA (AI only provides narratives)
   const reportData = {
     title: `${currentMonth} Report`,
@@ -201,6 +210,52 @@ CRITICAL: Reference the exact numbers from the VERIFIED DATA. Do not invent any 
       closedWonValue: closedWonValue,
       openDeals: openDeals.length,
       openDealsValue: openDealsValue
+    },
+    // Quarterly KPI data for the table (SERVER calculated)
+    kpiTable: {
+      year: quarterly.year,
+      rows: [
+        {
+          metric: "New Contacts",
+          subtext: "Contacts created in HubSpot",
+          yearEndProjection: contactCount,
+          q1: { projection: '-', actual: quarterly.contacts.Q1 || null },
+          q2: { projection: '-', actual: quarterly.contacts.Q2 || null },
+          q3: { projection: '-', actual: quarterly.contacts.Q3 || null },
+          q4: { projection: '-', actual: quarterly.contacts.Q4 || null },
+          goal: ''
+        },
+        {
+          metric: "New Deals",
+          subtext: "Deals created in pipeline",
+          yearEndProjection: dealCount,
+          q1: { projection: '-', actual: quarterly.deals.Q1 || null },
+          q2: { projection: '-', actual: quarterly.deals.Q2 || null },
+          q3: { projection: '-', actual: quarterly.deals.Q3 || null },
+          q4: { projection: '-', actual: quarterly.deals.Q4 || null },
+          goal: ''
+        },
+        {
+          metric: "Deal Value ($)",
+          subtext: "Total pipeline value",
+          yearEndProjection: totalDealValue,
+          q1: { projection: '-', actual: quarterly.dealValue.Q1 || null },
+          q2: { projection: '-', actual: quarterly.dealValue.Q2 || null },
+          q3: { projection: '-', actual: quarterly.dealValue.Q3 || null },
+          q4: { projection: '-', actual: quarterly.dealValue.Q4 || null },
+          goal: ''
+        },
+        {
+          metric: "New Companies",
+          subtext: "Companies added",
+          yearEndProjection: companyCount,
+          q1: { projection: '-', actual: quarterly.companies.Q1 || null },
+          q2: { projection: '-', actual: quarterly.companies.Q2 || null },
+          q3: { projection: '-', actual: quarterly.companies.Q3 || null },
+          q4: { projection: '-', actual: quarterly.companies.Q4 || null },
+          goal: ''
+        }
+      ]
     },
     // Stage/owner breakdowns come from SERVER calculations
     dealsByStage,
