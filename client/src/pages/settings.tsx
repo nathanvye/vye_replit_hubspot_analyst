@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { 
   ArrowLeft,
   Plus,
@@ -17,7 +18,8 @@ import {
   Database,
   LogOut,
   Menu,
-  RefreshCw
+  RefreshCw,
+  Search
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -45,6 +47,7 @@ export default function SettingsPage() {
   const [isLoadingAvailable, setIsLoadingAvailable] = useState(false);
   const [isAddingForm, setIsAddingForm] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -181,6 +184,13 @@ export default function SettingsPage() {
     af => !savedForms.some(sf => sf.formGuid === af.id)
   );
 
+  // Filter forms based on search query
+  const filteredForms = searchQuery.trim() === "" 
+    ? unaddedForms 
+    : unaddedForms.filter(form => 
+        form.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
   const Sidebar = () => (
     <div className="h-full flex flex-col bg-sidebar border-r border-sidebar-border text-sidebar-foreground">
       <div className="p-6 border-b border-sidebar-border">
@@ -301,6 +311,20 @@ export default function SettingsPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search forms by name..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      disabled={isLoadingAvailable}
+                      className="pl-10"
+                      data-testid="input-search-forms"
+                    />
+                  </div>
+                </div>
+
                 <div className="flex gap-2">
                   <Select 
                     value={selectedFormId} 
@@ -313,15 +337,23 @@ export default function SettingsPage() {
                           ? "Loading forms..." 
                           : unaddedForms.length === 0 
                             ? "All forms added" 
-                            : "Select a form"
+                            : filteredForms.length === 0
+                              ? "No matching forms"
+                              : "Select a form"
                       } />
                     </SelectTrigger>
                     <SelectContent>
-                      {unaddedForms.map(form => (
-                        <SelectItem key={form.id} value={form.id}>
-                          {form.name}
-                        </SelectItem>
-                      ))}
+                      {filteredForms.length === 0 ? (
+                        <div className="px-2 py-1.5 text-sm text-muted-foreground text-center">
+                          No forms found
+                        </div>
+                      ) : (
+                        filteredForms.map(form => (
+                          <SelectItem key={form.id} value={form.id}>
+                            {form.name}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <Button 
