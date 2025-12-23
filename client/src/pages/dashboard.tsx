@@ -20,7 +20,8 @@ import {
   X,
   BrainCircuit,
   FileText,
-  MessageSquare
+  MessageSquare,
+  Settings
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -182,6 +183,15 @@ export default function DashboardPage() {
             >
               <FileText className="w-4 h-4 mr-2" />
               Generated Reports
+            </Button>
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start text-sm h-9"
+              onClick={() => { setLocation("/settings"); setIsSidebarOpen(false); }}
+              data-testid="button-settings"
+            >
+              <Settings className="w-4 h-4 mr-2" />
+              Settings
             </Button>
           </div>
         </div>

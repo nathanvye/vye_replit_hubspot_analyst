@@ -167,13 +167,19 @@ export async function registerRoutes(
   });
 
   // Add a form by GUID (looks up form name from HubSpot)
+  const addFormSchema = z.object({
+    accountId: z.string().min(1, "Account ID is required"),
+    formGuid: z.string().min(1, "Form GUID is required")
+  });
+
   app.post("/api/hubspot/forms", async (req, res) => {
     try {
-      const { accountId, formGuid } = req.body;
-      
-      if (!accountId || !formGuid) {
-        return res.status(400).json({ error: "Account ID and form GUID are required" });
+      const parseResult = addFormSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: parseResult.error.errors[0]?.message || "Invalid request" });
       }
+
+      const { accountId, formGuid } = parseResult.data;
 
       // Get API key for this account
       const apiKey = await getApiKeyForAccount(accountId);
@@ -183,15 +189,15 @@ export async function registerRoutes(
 
       // Look up form name from HubSpot
       const formInfo = await getFormByGuid(apiKey, formGuid);
-      if (!formInfo) {
-        return res.status(404).json({ error: "Form not found in HubSpot. Please check the form GUID." });
+      if ('error' in formInfo && !('name' in formInfo)) {
+        return res.status(400).json({ error: formInfo.error });
       }
 
       // Save the form
       const form = await storage.createForm({
         hubspotAccountId: accountId,
-        formGuid: formInfo.formGuid,
-        formName: formInfo.name
+        formGuid: (formInfo as any).formGuid,
+        formName: (formInfo as any).name
       });
 
       res.json(form);

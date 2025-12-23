@@ -265,7 +265,7 @@ export async function getCompanies(apiKey: string, maxRecords = PAGINATION_CONFI
 }
 
 // Look up a form by its GUID and return the form name
-export async function getFormByGuid(apiKey: string, formGuid: string): Promise<{ formGuid: string; name: string } | null> {
+export async function getFormByGuid(apiKey: string, formGuid: string): Promise<{ formGuid: string; name: string; error?: string } | { error: string }> {
   const client = createHubSpotClient(apiKey);
   
   try {
@@ -279,8 +279,20 @@ export async function getFormByGuid(apiKey: string, formGuid: string): Promise<{
       name: response.name || 'Unknown Form'
     };
   } catch (error: any) {
-    console.error('Error fetching form by GUID:', error.body?.message || error.message);
-    return null;
+    const status = error.code || error.response?.status || error.statusCode;
+    const message = error.body?.message || error.message || 'Unknown error';
+    
+    console.error(`Error fetching form by GUID (${status}):`, message);
+    
+    if (status === 404) {
+      return { error: 'Form not found. Please check the form GUID is correct.' };
+    } else if (status === 401 || status === 403) {
+      return { error: 'Access denied. Your HubSpot API key may not have forms access.' };
+    } else if (status === 429) {
+      return { error: 'Rate limited. Please try again in a moment.' };
+    } else {
+      return { error: `Failed to lookup form: ${message}` };
+    }
   }
 }
 
