@@ -8,6 +8,7 @@ import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
 import AccountSelectPage from "@/pages/account-select.tsx";
 import DashboardPage from "@/pages/dashboard";
+import SettingsPage from "@/pages/settings";
 
 function Router() {
   return (
@@ -15,6 +16,7 @@ function Router() {
       <Route path="/" component={LoginPage} />
       <Route path="/select-account" component={AccountSelectPage} />
       <Route path="/dashboard" component={DashboardPage} />
+      <Route path="/settings" component={SettingsPage} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -1,0 +1,307 @@
+import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { useLocation } from "wouter";
+import { api } from "@/lib/api";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { 
+  ArrowLeft,
+  Plus,
+  Trash2,
+  FileText,
+  Loader2,
+  BrainCircuit,
+  Database,
+  LogOut,
+  Menu
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+interface HubspotForm {
+  id: string;
+  hubspotAccountId: string;
+  formGuid: string;
+  formName: string;
+  createdAt: string;
+}
+
+export default function SettingsPage() {
+  const { user, selectedAccount, selectedAccountName, logout } = useAuth();
+  const [, setLocation] = useLocation();
+  const [forms, setForms] = useState<HubspotForm[]>([]);
+  const [formGuidInput, setFormGuidInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isAddingForm, setIsAddingForm] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!user || !selectedAccount) {
+      setLocation("/");
+      return;
+    }
+    loadForms();
+  }, [user, selectedAccount, setLocation]);
+
+  const loadForms = async () => {
+    if (!selectedAccount) return;
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/hubspot/forms/${selectedAccount}`);
+      if (response.ok) {
+        const data = await response.json();
+        setForms(data);
+      }
+    } catch (error) {
+      console.error("Failed to load forms:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAddForm = async () => {
+    if (!formGuidInput.trim() || !selectedAccount) return;
+    
+    setIsAddingForm(true);
+    try {
+      const response = await fetch("/api/hubspot/forms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accountId: selectedAccount,
+          formGuid: formGuidInput.trim()
+        })
+      });
+
+      if (response.ok) {
+        const newForm = await response.json();
+        setForms(prev => [newForm, ...prev]);
+        setFormGuidInput("");
+        toast({
+          title: "Form Added",
+          description: `"${newForm.formName}" has been added successfully.`
+        });
+      } else {
+        const error = await response.json();
+        toast({
+          title: "Error",
+          description: error.error || "Failed to add form",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add form. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsAddingForm(false);
+    }
+  };
+
+  const handleDeleteForm = async (formId: string, formName: string) => {
+    try {
+      const response = await fetch(`/api/hubspot/forms/${formId}`, {
+        method: "DELETE"
+      });
+
+      if (response.ok) {
+        setForms(prev => prev.filter(f => f.id !== formId));
+        toast({
+          title: "Form Removed",
+          description: `"${formName}" has been removed.`
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to remove form",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to remove form. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const Sidebar = () => (
+    <div className="h-full flex flex-col bg-sidebar border-r border-sidebar-border text-sidebar-foreground">
+      <div className="p-6 border-b border-sidebar-border">
+        <div className="flex items-center gap-2 text-primary font-display font-bold text-xl">
+          <BrainCircuit className="w-6 h-6" />
+          <span>Vye Intel</span>
+        </div>
+      </div>
+
+      <div className="flex-1 py-6 px-4 space-y-6">
+        <div>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">Active Account</h3>
+          <div className="bg-sidebar-accent/50 rounded-lg p-3 border border-sidebar-border">
+            <div className="flex items-center gap-2 mb-2">
+              <Database className="w-4 h-4 text-primary" />
+              <span className="font-medium text-sm">{selectedAccountName || "Loading..."}</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              Connected
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">Navigation</h3>
+          <div className="space-y-1">
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start text-sm h-9"
+              onClick={() => setLocation("/dashboard")}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Generated Reports
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 border-t border-sidebar-border">
+        <div className="flex items-center gap-3 mb-4 px-2">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="bg-primary/20 text-primary">
+              {user?.name.charAt(0)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{user?.name}</p>
+            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+          </div>
+        </div>
+        <Button variant="outline" className="w-full justify-start text-muted-foreground" onClick={() => { logout(); setLocation("/"); }}>
+          <LogOut className="w-4 h-4 mr-2" />
+          Sign Out
+        </Button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex h-screen bg-background overflow-hidden">
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      <aside className={`
+        fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ease-in-out
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
+        <Sidebar />
+      </aside>
+
+      <main className="flex-1 flex flex-col min-w-0">
+        <header className="h-16 border-b border-border flex items-center justify-between px-4 md:px-6 bg-background/80 backdrop-blur-md sticky top-0 z-10">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(true)}>
+              <Menu className="w-5 h-5" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setLocation("/dashboard")} data-testid="button-back">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </div>
+        </header>
+
+        <ScrollArea className="flex-1 p-6">
+          <div className="max-w-2xl mx-auto space-y-6">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <h1 className="text-2xl font-bold mb-2">Settings</h1>
+              <p className="text-muted-foreground">Configure HubSpot forms for report tracking</p>
+            </motion.div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">HubSpot Forms</CardTitle>
+                <CardDescription>
+                  Add form GUIDs to track form submissions in your reports. The form name will be automatically retrieved from HubSpot.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter form GUID (e.g., 4c8e2a9b-9a1c-4d4f-b7b5-9d9c3b2f8c01)"
+                    value={formGuidInput}
+                    onChange={(e) => setFormGuidInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleAddForm()}
+                    disabled={isAddingForm}
+                    data-testid="input-form-guid"
+                  />
+                  <Button 
+                    onClick={handleAddForm} 
+                    disabled={!formGuidInput.trim() || isAddingForm}
+                    data-testid="button-add-form"
+                  >
+                    {isAddingForm ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Plus className="w-4 h-4" />
+                    )}
+                  </Button>
+                </div>
+
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : forms.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>No forms added yet</p>
+                    <p className="text-sm">Add a form GUID above to get started</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {forms.map((form) => (
+                      <motion.div
+                        key={form.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border"
+                        data-testid={`form-item-${form.id}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate" data-testid={`text-form-name-${form.id}`}>{form.formName}</p>
+                          <p className="text-xs text-muted-foreground font-mono truncate">{form.formGuid}</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground hover:text-destructive shrink-0"
+                          onClick={() => handleDeleteForm(form.id, form.formName)}
+                          data-testid={`button-delete-form-${form.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </ScrollArea>
+      </main>
+    </div>
+  );
+}
