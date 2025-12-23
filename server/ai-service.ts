@@ -139,9 +139,17 @@ export async function generateReport(hubspotData: any, context: LearnedContext[]
   const stageDescription = dealsByStage.map(s => `${s.stage}: ${s.count} deals worth $${s.value.toFixed(2)}`).join(', ');
   const ownerDescription = dealsByOwner.map(o => `${o.owner}: ${o.count} deals worth $${o.value.toFixed(2)}`).join(', ');
 
-  const prompt = `Analyze this HubSpot CRM data and write insights.
+  // Build quarterly description for AI context
+  const quarterlyDesc = summary.quarterly ? 
+    `Q1: ${summary.quarterly.contacts.Q1} contacts, ${summary.quarterly.deals.Q1} deals ($${summary.quarterly.dealValue.Q1.toFixed(0)}). ` +
+    `Q2: ${summary.quarterly.contacts.Q2} contacts, ${summary.quarterly.deals.Q2} deals ($${summary.quarterly.dealValue.Q2.toFixed(0)}). ` +
+    `Q3: ${summary.quarterly.contacts.Q3} contacts, ${summary.quarterly.deals.Q3} deals ($${summary.quarterly.dealValue.Q3.toFixed(0)}). ` +
+    `Q4: ${summary.quarterly.contacts.Q4} contacts, ${summary.quarterly.deals.Q4} deals ($${summary.quarterly.dealValue.Q4.toFixed(0)}).`
+    : 'No quarterly data available';
 
-VERIFIED DATA (these are facts):
+  const prompt = `Analyze this HubSpot CRM summary data and write insights.
+
+VERIFIED DATA (these are facts - do NOT make up other numbers):
 - Total Deals: ${dealCount}
 - Total Deal Value: $${totalDealValue.toFixed(2)}
 - Closed/Won Deals: ${closedWonDeals.length} worth $${closedWonValue.toFixed(2)}
@@ -150,22 +158,17 @@ VERIFIED DATA (these are facts):
 - Total Companies: ${companyCount}
 - Deals by Stage: ${stageDescription || 'None'}
 - Deals by Owner: ${ownerDescription || 'None'}
-
-DEAL DETAILS:
-${JSON.stringify(hubspotData.deals || [], null, 2)}
-
-CONTACT DETAILS:
-${JSON.stringify((hubspotData.contacts || []).slice(0, 30), null, 2)}
+- Quarterly Breakdown (${summary.quarterly?.year || new Date().getFullYear()}): ${quarterlyDesc}
 ${learnedContextPrompt}
 
-Write ONLY the narrative insights. Return JSON with ONLY these fields:
+Write ONLY narrative insights based on these numbers. Return JSON with ONLY these fields:
 {
   "revenueInsights": ["3-5 bullet points analyzing revenue/deals using the exact numbers above"],
   "leadGenInsights": ["3-5 bullet points analyzing contacts/leads using the exact numbers above"],
   "recommendations": ["3-5 actionable recommendations based on the data patterns"]
 }
 
-CRITICAL: Reference the exact numbers from the VERIFIED DATA. Do not invent any new statistics.`;
+CRITICAL: Reference the exact numbers from VERIFIED DATA. Do not invent any new statistics.`;
 
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',
