@@ -27,6 +27,16 @@ interface StageData {
   value: number;
 }
 
+interface FormSubmissionData {
+  formName: string;
+  formGuid: string;
+  Q1: number;
+  Q2: number;
+  Q3: number;
+  Q4: number;
+  total: number;
+}
+
 interface ReportData {
   title: string;
   subtitle: string;
@@ -34,6 +44,7 @@ interface ReportData {
     year: number;
     rows: KPIRow[];
   };
+  formSubmissions?: FormSubmissionData[];
   dealsByStage?: StageData[];
   dealsByOwner?: { owner: string; count: number; value: number }[];
   revenueInsights?: string[];
@@ -172,7 +183,11 @@ export function ReportView() {
         </div>
 
         {report.kpiTable && report.kpiTable.rows.length > 0 ? (
-          <KPITable rows={report.kpiTable.rows} year={report.kpiTable.year} />
+          <KPITable 
+            rows={report.kpiTable.rows} 
+            year={report.kpiTable.year}
+            formSubmissions={report.formSubmissions}
+          />
         ) : verified && (
           <Card className="overflow-hidden border-border/60 shadow-sm">
             <div className="overflow-x-auto">

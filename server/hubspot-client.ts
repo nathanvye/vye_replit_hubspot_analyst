@@ -397,9 +397,6 @@ export async function getFormSubmissions2025Quarterly(
 ): Promise<{ Q1: number; Q2: number; Q3: number; Q4: number; total: number }> {
   const client = createHubSpotClient(apiKey);
   
-  // Jan 1, 2025 UTC timestamp in milliseconds
-  const jan1_2025 = Date.UTC(2025, 0, 1);
-  
   // Quarter boundaries for 2025 (UTC timestamps in milliseconds)
   const quarters = {
     Q1: { start: Date.UTC(2025, 0, 1), end: Date.UTC(2025, 3, 1) },   // Jan 1 - Mar 31
@@ -408,53 +405,69 @@ export async function getFormSubmissions2025Quarterly(
     Q4: { start: Date.UTC(2025, 9, 1), end: Date.UTC(2026, 0, 1) }    // Oct 1 - Dec 31
   };
   
+  const jan1_2025 = quarters.Q1.start;
+  const jan1_2026 = quarters.Q4.end;
+  
   const results = { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
   
   try {
-    let offset = 0;
-    let hasMore = true;
-    const allSubmissions: { submittedAt: number }[] = [];
+    let after: string | undefined;
+    let totalFetched = 0;
+    let foundOlderThan2025 = false;
     
-    // Paginate through all submissions for 2025
-    while (hasMore) {
+    // Paginate through submissions using cursor-based pagination
+    // API returns submissions in reverse chronological order (newest first)
+    while (!foundOlderThan2025) {
+      const qs: any = { limit: 50 };
+      if (after) {
+        qs.after = after;
+      }
+      
       const httpResponse: any = await client.apiRequest({
         method: 'GET',
         path: `/form-integrations/v1/submissions/forms/${formGuid}`,
-        qs: { 
-          limit: 50,
-          after: offset > 0 ? offset : undefined,
-          'submittedAt__gte': jan1_2025
-        }
+        qs
       });
       
       const response = await httpResponse.json();
       const submissions = response.results || [];
       
+      if (submissions.length === 0) break;
+      
       for (const sub of submissions) {
-        allSubmissions.push({ submittedAt: sub.submittedAt });
+        const ts = sub.submittedAt;
+        
+        // Skip future submissions (shouldn't happen but be safe)
+        if (ts >= jan1_2026) continue;
+        
+        // If we've gone past 2025, we can stop paginating
+        if (ts < jan1_2025) {
+          foundOlderThan2025 = true;
+          break;
+        }
+        
+        // Count by quarter
+        if (ts >= quarters.Q1.start && ts < quarters.Q1.end) {
+          results.Q1++;
+        } else if (ts >= quarters.Q2.start && ts < quarters.Q2.end) {
+          results.Q2++;
+        } else if (ts >= quarters.Q3.start && ts < quarters.Q3.end) {
+          results.Q3++;
+        } else if (ts >= quarters.Q4.start && ts < quarters.Q4.end) {
+          results.Q4++;
+        }
       }
       
-      hasMore = response.hasMore === true;
-      offset = response.offset || (offset + submissions.length);
+      totalFetched += submissions.length;
+      
+      // Check for next page using cursor
+      after = response.paging?.next?.after;
+      if (!after) break;
       
       // Safety cap
-      if (allSubmissions.length >= 5000) {
-        console.log(`Form ${formGuid}: reached 5000 submissions, stopping`);
+      if (totalFetched >= 10000) {
+        console.log(`Form ${formGuid}: reached 10000 submissions, stopping`);
         break;
-      }
-    }
-    
-    // Count submissions by quarter
-    for (const sub of allSubmissions) {
-      const ts = sub.submittedAt;
-      if (ts >= quarters.Q1.start && ts < quarters.Q1.end) {
-        results.Q1++;
-      } else if (ts >= quarters.Q2.start && ts < quarters.Q2.end) {
-        results.Q2++;
-      } else if (ts >= quarters.Q3.start && ts < quarters.Q3.end) {
-        results.Q3++;
-      } else if (ts >= quarters.Q4.start && ts < quarters.Q4.end) {
-        results.Q4++;
       }
     }
     
