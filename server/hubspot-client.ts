@@ -273,13 +273,18 @@ export async function getAllForms(apiKey: string): Promise<{ id: string; name: s
     let after: string | undefined;
     
     do {
-      const response: any = await client.apiRequest({
+      const httpResponse: any = await client.apiRequest({
         method: 'GET',
         path: '/marketing/v3/forms',
         qs: { limit: 100, ...(after ? { after } : {}) }
       });
       
-      const results = response.results || [];
+      // apiRequest returns a fetch Response object - need to parse JSON
+      const response = await httpResponse.json();
+      
+      const results = response?.results || [];
+      console.log(`Found ${results.length} forms in this page`);
+      
       for (const form of results) {
         forms.push({
           id: form.id,
@@ -288,8 +293,10 @@ export async function getAllForms(apiKey: string): Promise<{ id: string; name: s
         });
       }
       
-      after = response.paging?.next?.after;
+      after = response?.paging?.next?.after;
     } while (after);
+    
+    console.log(`Total forms fetched: ${forms.length}`);
     
     // Sort by name
     forms.sort((a, b) => a.name.localeCompare(b.name));
@@ -306,10 +313,13 @@ export async function getFormByGuid(apiKey: string, formGuid: string): Promise<{
   const client = createHubSpotClient(apiKey);
   
   try {
-    const response: any = await client.apiRequest({
+    const httpResponse: any = await client.apiRequest({
       method: 'GET',
       path: `/marketing/v3/forms/${formGuid}`
     });
+    
+    // apiRequest returns a fetch Response object - need to parse JSON
+    const response = await httpResponse.json();
     
     return {
       formGuid: response.id || formGuid,
