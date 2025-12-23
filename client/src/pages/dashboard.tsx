@@ -163,17 +163,6 @@ export default function DashboardPage() {
             </Button>
           </div>
         </div>
-
-        <div>
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">History</h3>
-          <div className="space-y-1">
-            {["Q4 Revenue Analysis", "Deal Pipeline Review", "Training: Custom Fields"].map((item, i) => (
-              <Button key={i} variant="ghost" className="w-full justify-start text-sm h-9 font-normal truncate">
-                {item}
-              </Button>
-            ))}
-          </div>
-        </div>
       </div>
 
       <div className="p-4 border-t border-sidebar-border">
