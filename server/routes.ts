@@ -7,7 +7,8 @@ import {
   getCompanies, 
   searchDeals,
   validateApiKeyAndGetAccountInfo,
-  getComprehensiveData
+  getComprehensiveData,
+  getFormByGuid
 } from "./hubspot-client";
 import { analyzeWithAI, generateReport, extractLearning } from "./ai-service";
 import { encrypt, decrypt } from "./encryption";
@@ -146,6 +147,69 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error validating API key:", error);
       res.status(500).json({ error: "Failed to validate API key" });
+    }
+  });
+
+  // ==========================================
+  // HubSpot Forms Management
+  // ==========================================
+
+  // Get forms for an account
+  app.get("/api/hubspot/forms/:accountId", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const forms = await storage.getFormsByAccount(accountId);
+      res.json(forms);
+    } catch (error) {
+      console.error("Error fetching forms:", error);
+      res.status(500).json({ error: "Failed to fetch forms" });
+    }
+  });
+
+  // Add a form by GUID (looks up form name from HubSpot)
+  app.post("/api/hubspot/forms", async (req, res) => {
+    try {
+      const { accountId, formGuid } = req.body;
+      
+      if (!accountId || !formGuid) {
+        return res.status(400).json({ error: "Account ID and form GUID are required" });
+      }
+
+      // Get API key for this account
+      const apiKey = await getApiKeyForAccount(accountId);
+      if (!apiKey) {
+        return res.status(400).json({ error: "Could not find API key for account" });
+      }
+
+      // Look up form name from HubSpot
+      const formInfo = await getFormByGuid(apiKey, formGuid);
+      if (!formInfo) {
+        return res.status(404).json({ error: "Form not found in HubSpot. Please check the form GUID." });
+      }
+
+      // Save the form
+      const form = await storage.createForm({
+        hubspotAccountId: accountId,
+        formGuid: formInfo.formGuid,
+        formName: formInfo.name
+      });
+
+      res.json(form);
+    } catch (error) {
+      console.error("Error adding form:", error);
+      res.status(500).json({ error: "Failed to add form" });
+    }
+  });
+
+  // Delete a form
+  app.delete("/api/hubspot/forms/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteForm(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting form:", error);
+      res.status(500).json({ error: "Failed to delete form" });
     }
   });
 

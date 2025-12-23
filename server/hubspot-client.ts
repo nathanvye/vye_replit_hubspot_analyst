@@ -264,6 +264,26 @@ export async function getCompanies(apiKey: string, maxRecords = PAGINATION_CONFI
   return companies;
 }
 
+// Look up a form by its GUID and return the form name
+export async function getFormByGuid(apiKey: string, formGuid: string): Promise<{ formGuid: string; name: string } | null> {
+  const client = createHubSpotClient(apiKey);
+  
+  try {
+    const response: any = await client.apiRequest({
+      method: 'GET',
+      path: `/marketing/v3/forms/${formGuid}`
+    });
+    
+    return {
+      formGuid: response.id || formGuid,
+      name: response.name || 'Unknown Form'
+    };
+  } catch (error: any) {
+    console.error('Error fetching form by GUID:', error.body?.message || error.message);
+    return null;
+  }
+}
+
 // Fetch form submissions
 export async function getFormSubmissions(apiKey: string, limit = 50): Promise<any[]> {
   const client = createHubSpotClient(apiKey);
