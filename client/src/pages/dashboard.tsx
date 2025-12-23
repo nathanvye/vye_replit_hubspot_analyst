@@ -11,8 +11,7 @@ import { ReportView } from "@/components/ReportView";
 import { 
   Send, 
   Bot, 
-  User as UserIcon, 
-  Settings, 
+  User as UserIcon,
   Database, 
   Sparkles,
   RefreshCw,
@@ -41,13 +40,15 @@ interface Message {
 type ViewMode = "chat" | "report";
 
 export default function DashboardPage() {
-  const { user, selectedAccount, selectedAccountName, conversationId, logout } = useAuth();
+  const { user, selectedAccount, selectedAccountName, conversationId, logout, selectAccount } = useAuth();
   const [, setLocation] = useLocation();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("report");
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -56,6 +57,16 @@ export default function DashboardPage() {
       setLocation("/");
     }
   }, [user, selectedAccount, setLocation]);
+
+  useEffect(() => {
+    if (user) {
+      setLoadingAccounts(true);
+      api.getHubSpotAccounts(user.id)
+        .then(data => setAccounts(data))
+        .catch(err => console.error("Failed to load accounts:", err))
+        .finally(() => setLoadingAccounts(false));
+    }
+  }, [user]);
 
   useEffect(() => {
     if (conversationId) {
@@ -129,16 +140,35 @@ export default function DashboardPage() {
 
       <div className="flex-1 py-6 px-4 space-y-6">
         <div>
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">Current Context</h3>
-          <div className="bg-sidebar-accent/50 rounded-lg p-3 border border-sidebar-border">
-            <div className="flex items-center gap-2 mb-2">
-              <Database className="w-4 h-4 text-primary" />
-              <span className="font-medium text-sm">{selectedAccountName || "Loading..."}</span>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">Active Account</h3>
+          <div className="space-y-2">
+            <div className="bg-sidebar-accent/50 rounded-lg p-3 border border-sidebar-border">
+              <div className="flex items-center gap-2 mb-2">
+                <Database className="w-4 h-4 text-primary" />
+                <span className="font-medium text-sm">{selectedAccountName || "Loading..."}</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                Connected
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              Connected
-            </div>
+            {accounts.length > 1 && (
+              <select 
+                value={selectedAccount || ""}
+                onChange={(e) => {
+                  const accountId = e.target.value;
+                  const account = accounts.find(a => a.id === accountId);
+                  if (account) {
+                    selectAccount(account.id, account.name);
+                  }
+                }}
+                className="w-full px-3 py-2 rounded-lg border border-sidebar-border bg-sidebar text-sm text-sidebar-foreground cursor-pointer hover:border-primary/50 transition-colors"
+              >
+                {accounts.map(account => (
+                  <option key={account.id} value={account.id}>{account.name}</option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
 
@@ -206,9 +236,6 @@ export default function DashboardPage() {
             <h2 className="text-lg font-semibold">{selectedAccountName}</h2>
           </div>
           <div className="flex items-center gap-2">
-             <Button variant="outline" size="sm" className="hidden sm:flex">
-               <Settings className="w-4 h-4 mr-2" /> Settings
-             </Button>
           </div>
         </header>
 
