@@ -622,12 +622,12 @@ export async function getWebsiteSessionsQuarterly(apiKey: string): Promise<{ Q1:
   const client = createHubSpotClient(apiKey);
   const currentYear = new Date().getFullYear();
   
-  // Define quarter boundaries for current year
+  // Define quarter boundaries for current year (format: YYYYMMDD for v2 API)
   const quarters = {
-    Q1: { start: `${currentYear}-01-01`, end: `${currentYear}-03-31` },
-    Q2: { start: `${currentYear}-04-01`, end: `${currentYear}-06-30` },
-    Q3: { start: `${currentYear}-07-01`, end: `${currentYear}-09-30` },
-    Q4: { start: `${currentYear}-10-01`, end: `${currentYear}-12-31` }
+    Q1: { start: `${currentYear}0101`, end: `${currentYear}0331` },
+    Q2: { start: `${currentYear}0401`, end: `${currentYear}0630` },
+    Q3: { start: `${currentYear}0701`, end: `${currentYear}0930` },
+    Q4: { start: `${currentYear}1001`, end: `${currentYear}1231` }
   };
   
   const results = { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
@@ -641,31 +641,23 @@ export async function getWebsiteSessionsQuarterly(apiKey: string): Promise<{ Q1:
     quarterIndex++;
     
     try {
+      // Use Analytics API v2 which provides traffic/session data
       const httpResponse: any = await client.apiRequest({
-        method: 'POST',
-        path: '/analytics/v3/reports/traffic',
-        body: {
-          metrics: ["sessions"],
-          timeRange: {
-            start: range.start,
-            end: range.end
-          }
+        method: 'GET',
+        path: '/analytics/v2/reports/sources/total',
+        qs: {
+          start: range.start,
+          end: range.end
         }
       });
       
       // apiRequest returns a fetch Response object - need to parse JSON
       const response = await httpResponse.json();
       
-      // Sum up all session values in the response
+      // The v2 API returns 'visits' which is equivalent to sessions
       let quarterSessions = 0;
-      if (response.results && Array.isArray(response.results)) {
-        for (const result of response.results) {
-          if (result.metric === 'sessions' && result.values && Array.isArray(result.values)) {
-            for (const value of result.values) {
-              quarterSessions += value.value || 0;
-            }
-          }
-        }
+      if (response.totals && response.totals.visits !== undefined) {
+        quarterSessions = response.totals.visits;
       }
       
       results[quarter as keyof typeof results] = quarterSessions;
