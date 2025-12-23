@@ -1,8 +1,64 @@
 import { Client } from '@hubspot/api-client';
 
+// Configuration for pagination
+const PAGINATION_CONFIG = {
+  pageSize: 100,       // Max per HubSpot API
+  maxRecords: 5000,    // Safety cap to prevent infinite loops
+  retryDelayMs: 1000,  // Initial delay for rate limit retries
+  maxRetries: 3        // Max retries on 429 errors
+};
+
 // Create a HubSpot client with a user-provided API key (private app access token)
 export function createHubSpotClient(apiKey: string) {
   return new Client({ accessToken: apiKey });
+}
+
+// Sleep utility for rate limiting
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Generic paginated fetch for HubSpot CRM objects
+async function fetchAllPaginated<T>(
+  fetchPage: (after?: string) => Promise<{ results: T[]; paging?: { next?: { after: string } } }>,
+  maxRecords: number = PAGINATION_CONFIG.maxRecords
+): Promise<T[]> {
+  const allResults: T[] = [];
+  let after: string | undefined = undefined;
+  let retries = 0;
+
+  while (allResults.length < maxRecords) {
+    try {
+      const response = await fetchPage(after);
+      allResults.push(...response.results);
+
+      // Check if there's more data
+      if (!response.paging?.next?.after) {
+        break; // No more pages
+      }
+
+      after = response.paging.next.after;
+      retries = 0; // Reset retries on success
+    } catch (error: any) {
+      // Handle rate limiting (429 errors)
+      if (error.code === 429 || error.response?.status === 429) {
+        if (retries >= PAGINATION_CONFIG.maxRetries) {
+          console.warn('Max retries reached for rate limiting, returning partial results');
+          break;
+        }
+        const delay = PAGINATION_CONFIG.retryDelayMs * Math.pow(2, retries);
+        console.log(`Rate limited, waiting ${delay}ms before retry...`);
+        await sleep(delay);
+        retries++;
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  if (allResults.length >= maxRecords) {
+    console.log(`Reached max records limit (${maxRecords}), stopping pagination`);
+  }
+
+  return allResults;
 }
 
 // Validate an API key by fetching account info
@@ -56,11 +112,11 @@ export async function getOwners(apiKey: string): Promise<Map<string, string>> {
   return ownerMap;
 }
 
-// Fetch deals with enriched properties
-export async function getDeals(apiKey: string, limit = 100) {
+// Fetch ALL deals with pagination
+export async function getDeals(apiKey: string, maxRecords = PAGINATION_CONFIG.maxRecords) {
   const client = createHubSpotClient(apiKey);
   
-  const response = await client.crm.deals.basicApi.getPage(limit, undefined, [
+  const properties = [
     'dealname',
     'amount',
     'dealstage',
@@ -75,15 +131,28 @@ export async function getDeals(apiKey: string, limit = 100) {
     'num_associated_contacts',
     'hs_forecast_amount',
     'hs_closed_amount'
-  ]);
+  ];
+
+  const deals = await fetchAllPaginated(
+    async (after) => {
+      const response = await client.crm.deals.basicApi.getPage(
+        PAGINATION_CONFIG.pageSize,
+        after,
+        properties
+      );
+      return response;
+    },
+    maxRecords
+  );
   
-  return response.results;
+  console.log(`Fetched ${deals.length} deals total`);
+  return deals;
 }
 
 // Fetch deals with owner names resolved
-export async function getDealsWithOwners(apiKey: string, limit = 100) {
+export async function getDealsWithOwners(apiKey: string, maxRecords = PAGINATION_CONFIG.maxRecords) {
   const [deals, ownerMap] = await Promise.all([
-    getDeals(apiKey, limit),
+    getDeals(apiKey, maxRecords),
     getOwners(apiKey)
   ]);
   
@@ -100,11 +169,11 @@ export async function getDealsWithOwners(apiKey: string, limit = 100) {
   });
 }
 
-// Fetch contacts with enriched properties
-export async function getContacts(apiKey: string, limit = 100) {
+// Fetch ALL contacts with pagination
+export async function getContacts(apiKey: string, maxRecords = PAGINATION_CONFIG.maxRecords) {
   const client = createHubSpotClient(apiKey);
   
-  const response = await client.crm.contacts.basicApi.getPage(limit, undefined, [
+  const properties = [
     'firstname',
     'lastname',
     'email',
@@ -122,15 +191,28 @@ export async function getContacts(apiKey: string, limit = 100) {
     'recent_conversion_event_name',
     'first_conversion_event_name',
     'num_conversion_events'
-  ]);
+  ];
+
+  const contacts = await fetchAllPaginated(
+    async (after) => {
+      const response = await client.crm.contacts.basicApi.getPage(
+        PAGINATION_CONFIG.pageSize,
+        after,
+        properties
+      );
+      return response;
+    },
+    maxRecords
+  );
   
-  return response.results;
+  console.log(`Fetched ${contacts.length} contacts total`);
+  return contacts;
 }
 
 // Fetch contacts with owner names resolved
-export async function getContactsWithOwners(apiKey: string, limit = 100) {
+export async function getContactsWithOwners(apiKey: string, maxRecords = PAGINATION_CONFIG.maxRecords) {
   const [contacts, ownerMap] = await Promise.all([
-    getContacts(apiKey, limit),
+    getContacts(apiKey, maxRecords),
     getOwners(apiKey)
   ]);
   
@@ -147,11 +229,11 @@ export async function getContactsWithOwners(apiKey: string, limit = 100) {
   });
 }
 
-// Fetch companies with enriched properties
-export async function getCompanies(apiKey: string, limit = 100) {
+// Fetch ALL companies with pagination
+export async function getCompanies(apiKey: string, maxRecords = PAGINATION_CONFIG.maxRecords) {
   const client = createHubSpotClient(apiKey);
   
-  const response = await client.crm.companies.basicApi.getPage(limit, undefined, [
+  const properties = [
     'name',
     'domain',
     'industry',
@@ -164,9 +246,22 @@ export async function getCompanies(apiKey: string, limit = 100) {
     'state',
     'country',
     'type'
-  ]);
+  ];
+
+  const companies = await fetchAllPaginated(
+    async (after) => {
+      const response = await client.crm.companies.basicApi.getPage(
+        PAGINATION_CONFIG.pageSize,
+        after,
+        properties
+      );
+      return response;
+    },
+    maxRecords
+  );
   
-  return response.results;
+  console.log(`Fetched ${companies.length} companies total`);
+  return companies;
 }
 
 // Fetch form submissions
@@ -257,15 +352,19 @@ export async function getPipelineStages(apiKey: string): Promise<Map<string, { l
   return stageMap;
 }
 
-// Comprehensive data fetch for analysis
-export async function getComprehensiveData(apiKey: string) {
+// Comprehensive data fetch for analysis (with full pagination)
+export async function getComprehensiveData(apiKey: string, maxRecords = PAGINATION_CONFIG.maxRecords) {
+  console.log('Starting comprehensive data fetch with pagination...');
+  
   const [deals, contacts, companies, ownerMap, stageMap] = await Promise.all([
-    getDeals(apiKey, 100).catch(e => { console.error('Deals fetch error:', e.body?.message || e.message); return []; }),
-    getContacts(apiKey, 100).catch(e => { console.error('Contacts fetch error:', e.body?.message || e.message); return []; }),
-    getCompanies(apiKey, 50).catch(e => { console.error('Companies fetch error:', e.body?.message || e.message); return []; }),
+    getDeals(apiKey, maxRecords).catch(e => { console.error('Deals fetch error:', e.body?.message || e.message); return []; }),
+    getContacts(apiKey, maxRecords).catch(e => { console.error('Contacts fetch error:', e.body?.message || e.message); return []; }),
+    getCompanies(apiKey, maxRecords).catch(e => { console.error('Companies fetch error:', e.body?.message || e.message); return []; }),
     getOwners(apiKey),
     getPipelineStages(apiKey)
   ]);
+  
+  console.log(`Comprehensive fetch complete: ${deals.length} deals, ${contacts.length} contacts, ${companies.length} companies`);
   
   // Enrich deals with owner names and stage labels
   const enrichedDeals = deals.map(deal => {
