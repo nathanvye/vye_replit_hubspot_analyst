@@ -191,10 +191,19 @@ LEAD GENERATION EXAMPLES (reference exact data):
 {
   "revenueInsights": ["4-6 bullet points about revenue/deals using EXACT numbers from verified data - focus on YTD totals, Q${currentQuarter} specifics, and pipeline value"],
   "leadGenInsights": ["4-6 bullet points about contacts/leads using EXACT numbers - mention QoQ trends, quarterly patterns, and contact growth"],
-  "recommendations": ["3-5 actionable recommendations based on the data patterns"]
+  "recommendations": ["5-7 specific, actionable recommendations"]
 }
 
-CRITICAL: Every number you mention MUST come from the VERIFIED DATA above. Do not invent statistics.`;
+RECOMMENDATIONS SHOULD BE SPECIFIC AND ACTIONABLE like these examples:
+- "Lean into [top product] to drive profitability. Could support with sales enablement messaging, battle cards, sell sheets, etc."
+- "Consider a [product] branch of the product identifier."
+- "[Product X] becoming a close runner-up to [Product Y] and often with larger deals. Lean heavy into this product in the next quarter."
+- "Consider repurposing webinar content across social media and email campaigns to drive TOF contacts toward lower-funnel education."
+- "Contact growth patterns suggest a content offer or webinar specifically for [audience segment] may prove worthwhile."
+- Suggest specific campaign ideas (holiday campaigns, EOY pushes, exclusivity angles)
+- Reference specific products, deal types, or owner performance from the data
+
+CRITICAL: Every number you mention MUST come from the VERIFIED DATA above. Do not invent statistics. Recommendations should reference actual patterns in the data.`;
 
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',
