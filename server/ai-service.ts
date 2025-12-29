@@ -197,7 +197,8 @@ CRITICAL: Reference the exact numbers from VERIFIED DATA. Do not invent any new 
     deals: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 },
     dealValue: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 },
     companies: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 },
-    websiteSessions: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 }
+    websiteSessions: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 },
+    websiteSessionsStatus: undefined as string | undefined
   };
 
   // BUILD REPORT WITH SERVER-VERIFIED DATA (AI only provides narratives)
@@ -216,11 +217,19 @@ CRITICAL: Reference the exact numbers from VERIFIED DATA. Do not invent any new 
       openDealsValue: openDealsValue
     },
     // Quarterly KPI data for the table (SERVER calculated)
-    // NOTE: Website Sessions removed - HubSpot Reports API requires payload-specific integration
-    // that varies by report configuration. Will be reintroduced when a verified solution is available.
     kpiTable: {
       year: quarterly.year,
       rows: [
+        {
+          metric: "Website Sessions",
+          subtext: quarterly.websiteSessionsStatus || `Website sessions from HubSpot Reports API (${quarterly.year})`,
+          yearEndProjection: quarterly.websiteSessions.Q1 + quarterly.websiteSessions.Q2 + quarterly.websiteSessions.Q3 + quarterly.websiteSessions.Q4,
+          q1: { projection: '-', actual: quarterly.websiteSessions.Q1 },
+          q2: { projection: '-', actual: quarterly.websiteSessions.Q2 },
+          q3: { projection: '-', actual: quarterly.websiteSessions.Q3 },
+          q4: { projection: '-', actual: quarterly.websiteSessions.Q4 },
+          goal: ''
+        },
         {
           metric: "New Contacts",
           subtext: `Contacts created in HubSpot (${quarterly.year} only)`,

@@ -82,6 +82,21 @@ For full functionality, ensure your HubSpot Private App has these scopes enabled
 - `crm.objects.companies.read` - Read companies
 - `crm.schemas.deals.read` - Read deal pipelines/stages
 - `forms` - Read form submissions
+- `reports` - Read reports (required for website sessions)
 
-### Notes on Website Sessions
-Website sessions data is currently not available through the HubSpot Private App integration. The HubSpot Analytics API v2 requires internal-only scopes, and the Reports API requires payload-specific integration that varies by account configuration. This feature is deferred pending a verified solution.
+### Website Sessions Configuration
+Website sessions use the HubSpot Reports API (not Analytics API v2 which is unavailable for Private Apps).
+
+**How it works:**
+1. The app calls `GET /reports/v2/reports` to list available reports
+2. It looks for a traffic/sessions report by name or category
+3. For each quarter, it calls `POST /reports/v2/reports/{id}/data` with date range
+4. It sums all source values to get total sessions per quarter
+
+**Optional configuration:**
+- `HUBSPOT_TRAFFIC_REPORT_ID` - Set this environment variable to specify a specific report ID instead of auto-discovery. Useful if auto-discovery doesn't find the right report.
+
+**Troubleshooting:**
+- If sessions show 0, check that your Private App has the `reports` scope
+- Check server logs to see available reports and their IDs
+- Create a "Sessions by source" report in HubSpot if one doesn't exist
