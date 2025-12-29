@@ -3,7 +3,7 @@ import { Client } from "@hubspot/api-client";
 // Configuration for pagination
 const PAGINATION_CONFIG = {
   pageSize: 100, // Max per HubSpot API
-  maxRecords: 5000, // Safety cap to prevent infinite loops
+  maxRecords: 100000, // Safety cap - increased to handle large datasets
   retryDelayMs: 1000, // Initial delay for rate limit retries
   maxRetries: 3, // Max retries on 429 errors
 };
@@ -434,34 +434,35 @@ export async function getFormSubmissions(
   return submissions;
 }
 
-// Get form submissions for 2025 with quarterly breakdown
-export async function getFormSubmissions2025Quarterly(
+// Get form submissions for a specific year with quarterly breakdown
+export async function getFormSubmissionsQuarterly(
   apiKey: string,
   formGuid: string,
+  year: number = new Date().getFullYear(),
 ): Promise<{ Q1: number; Q2: number; Q3: number; Q4: number; total: number }> {
   const client = createHubSpotClient(apiKey);
 
-  // Quarter boundaries for 2025 (UTC timestamps in milliseconds)
+  // Quarter boundaries for the specified year (UTC timestamps in milliseconds)
   const quarters = {
-    Q1: { start: Date.UTC(2025, 0, 1), end: Date.UTC(2025, 3, 1) }, // Jan 1 - Mar 31
-    Q2: { start: Date.UTC(2025, 3, 1), end: Date.UTC(2025, 6, 1) }, // Apr 1 - Jun 30
-    Q3: { start: Date.UTC(2025, 6, 1), end: Date.UTC(2025, 9, 1) }, // Jul 1 - Sep 30
-    Q4: { start: Date.UTC(2025, 9, 1), end: Date.UTC(2026, 0, 1) }, // Oct 1 - Dec 31
+    Q1: { start: Date.UTC(year, 0, 1), end: Date.UTC(year, 3, 1) }, // Jan 1 - Mar 31
+    Q2: { start: Date.UTC(year, 3, 1), end: Date.UTC(year, 6, 1) }, // Apr 1 - Jun 30
+    Q3: { start: Date.UTC(year, 6, 1), end: Date.UTC(year, 9, 1) }, // Jul 1 - Sep 30
+    Q4: { start: Date.UTC(year, 9, 1), end: Date.UTC(year + 1, 0, 1) }, // Oct 1 - Dec 31
   };
 
-  const jan1_2025 = quarters.Q1.start;
-  const jan1_2026 = quarters.Q4.end;
+  const yearStart = quarters.Q1.start;
+  const yearEnd = quarters.Q4.end;
 
   const results = { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
 
   try {
     let after: string | undefined;
     let totalFetched = 0;
-    let foundOlderThan2025 = false;
+    let foundOlderThanYear = false;
 
     // Paginate through submissions using cursor-based pagination
     // API returns submissions in reverse chronological order (newest first)
-    while (!foundOlderThan2025) {
+    while (!foundOlderThanYear) {
       const qs: any = { limit: 50 };
       if (after) {
         qs.after = after;
@@ -482,11 +483,11 @@ export async function getFormSubmissions2025Quarterly(
         const ts = sub.submittedAt;
 
         // Skip future submissions (shouldn't happen but be safe)
-        if (ts >= jan1_2026) continue;
+        if (ts >= yearEnd) continue;
 
-        // If we've gone past 2025, we can stop paginating
-        if (ts < jan1_2025) {
-          foundOlderThan2025 = true;
+        // If we've gone past the target year, we can stop paginating
+        if (ts < yearStart) {
+          foundOlderThanYear = true;
           break;
         }
 
@@ -553,18 +554,19 @@ export async function searchDeals(apiKey: string, filters: any) {
 // Helper to delay execution
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Get contacts created in 2025 with quarterly breakdown using search API
-export async function getContacts2025Quarterly(
+// Get contacts created in a specific year with quarterly breakdown using search API
+export async function getContactsQuarterly(
   apiKey: string,
+  year: number = new Date().getFullYear(),
 ): Promise<{ Q1: number; Q2: number; Q3: number; Q4: number; total: number }> {
   const client = createHubSpotClient(apiKey);
 
-  // Define quarter boundaries for 2025 (UTC timestamps in milliseconds)
+  // Define quarter boundaries for the specified year (UTC timestamps in milliseconds)
   const quarters = {
-    Q1: { start: Date.UTC(2025, 0, 1), end: Date.UTC(2025, 3, 1) }, // Jan 1 - Mar 31
-    Q2: { start: Date.UTC(2025, 3, 1), end: Date.UTC(2025, 6, 1) }, // Apr 1 - Jun 30
-    Q3: { start: Date.UTC(2025, 6, 1), end: Date.UTC(2025, 9, 1) }, // Jul 1 - Sep 30
-    Q4: { start: Date.UTC(2025, 9, 1), end: Date.UTC(2026, 0, 1) }, // Oct 1 - Dec 31
+    Q1: { start: Date.UTC(year, 0, 1), end: Date.UTC(year, 3, 1) }, // Jan 1 - Mar 31
+    Q2: { start: Date.UTC(year, 3, 1), end: Date.UTC(year, 6, 1) }, // Apr 1 - Jun 30
+    Q3: { start: Date.UTC(year, 6, 1), end: Date.UTC(year, 9, 1) }, // Jul 1 - Sep 30
+    Q4: { start: Date.UTC(year, 9, 1), end: Date.UTC(year + 1, 0, 1) }, // Oct 1 - Dec 31
   };
 
   const results = { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
@@ -632,7 +634,7 @@ export async function getContacts2025Quarterly(
 
       results[quarter as keyof typeof results] = quarterCount;
       results.total += quarterCount;
-      console.log(`2025 ${quarter}: ${quarterCount} contacts`);
+      console.log(`${year} ${quarter}: ${quarterCount} contacts`);
     } catch (error: any) {
       console.error(
         `Error fetching ${quarter} contacts:`,
@@ -689,7 +691,7 @@ export async function getContacts2025Quarterly(
 
           results[quarter as keyof typeof results] = quarterCount;
           results.total += quarterCount;
-          console.log(`2025 ${quarter} (retry): ${quarterCount} contacts`);
+          console.log(`${year} ${quarter} (retry): ${quarterCount} contacts`);
         } catch (retryError: any) {
           console.error(
             `Retry failed for ${quarter}:`,
@@ -700,23 +702,26 @@ export async function getContacts2025Quarterly(
     }
   }
 
-  console.log(`Total 2025 contacts: ${results.total}`);
+  console.log(`Total ${year} contacts: ${results.total}`);
   return results;
 }
 
-// Get website sessions by quarter for the current year
+// Get website sessions by quarter for a specific year
+// NOTE: This requires the 'business-intelligence' scope in the HubSpot Private App.
+// If you see all zeros, ensure the Private App has this scope enabled.
+// Go to Settings → Integrations → Private Apps → Edit → Scopes → Enable 'business-intelligence'
 export async function getWebsiteSessionsQuarterly(
   apiKey: string,
+  year: number = new Date().getFullYear(),
 ): Promise<{ Q1: number; Q2: number; Q3: number; Q4: number; total: number }> {
   const client = createHubSpotClient(apiKey);
-  const currentYear = new Date().getFullYear();
 
-  // Define quarter boundaries for current year (format: YYYYMMDD for v2 API)
+  // Define quarter boundaries for the specified year (format: YYYYMMDD for v2 API)
   const quarters = {
-    Q1: { start: `${currentYear}0101`, end: `${currentYear}0331` },
-    Q2: { start: `${currentYear}0401`, end: `${currentYear}0630` },
-    Q3: { start: `${currentYear}0701`, end: `${currentYear}0930` },
-    Q4: { start: `${currentYear}1001`, end: `${currentYear}1231` },
+    Q1: { start: `${year}0101`, end: `${year}0331` },
+    Q2: { start: `${year}0401`, end: `${year}0630` },
+    Q3: { start: `${year}0701`, end: `${year}0930` },
+    Q4: { start: `${year}1001`, end: `${year}1231` },
   };
 
   const results = { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
@@ -756,7 +761,7 @@ export async function getWebsiteSessionsQuarterly(
       results[quarter as keyof typeof results] = quarterSessions;
       results.total += quarterSessions;
       console.log(
-        `${currentYear} ${quarter} website sessions::: ${quarterSessions}`,
+        `${year} ${quarter} website sessions::: ${quarterSessions}`,
       );
     } catch (error: any) {
       console.error(
@@ -767,7 +772,7 @@ export async function getWebsiteSessionsQuarterly(
     }
   }
 
-  console.log(`Total ${currentYear} website sessions: ${results.total}`);
+  console.log(`Total ${year} website sessions: ${results.total}`);
   return results;
 }
 
@@ -808,8 +813,9 @@ export async function getPipelineStages(
 export async function getComprehensiveData(
   apiKey: string,
   maxRecords = PAGINATION_CONFIG.maxRecords,
+  year: number = new Date().getFullYear(),
 ) {
-  console.log("Starting comprehensive data fetch with pagination...");
+  console.log(`Starting comprehensive data fetch with pagination for year ${year}...`);
 
   const [
     deals,
@@ -817,8 +823,8 @@ export async function getComprehensiveData(
     companies,
     ownerMap,
     stageMap,
-    contacts2025Quarterly,
-    websiteSessionsQuarterly,
+    contactsQuarterly,
+    websiteSessionsData,
   ] = await Promise.all([
     getDeals(apiKey, maxRecords).catch((e) => {
       console.error("Deals fetch error:", e.body?.message || e.message);
@@ -834,11 +840,11 @@ export async function getComprehensiveData(
     }),
     getOwners(apiKey),
     getPipelineStages(apiKey),
-    getContacts2025Quarterly(apiKey).catch((e) => {
-      console.error("2025 contacts fetch error:", e.body?.message || e.message);
+    getContactsQuarterly(apiKey, year).catch((e) => {
+      console.error(`${year} contacts fetch error:`, e.body?.message || e.message);
       return { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
     }),
-    getWebsiteSessionsQuarterly(apiKey).catch((e) => {
+    getWebsiteSessionsQuarterly(apiKey, year).catch((e) => {
       console.error(
         "Website sessions fetch error:",
         e.body?.message || e.message,
@@ -848,7 +854,7 @@ export async function getComprehensiveData(
   ]);
 
   console.log(
-    `Comprehensive fetch complete: ${deals.length} deals, ${contacts.length} contacts, ${companies.length} companies, ${contacts2025Quarterly.total} contacts in 2025`,
+    `Comprehensive fetch complete: ${deals.length} deals, ${contacts.length} contacts, ${companies.length} companies, ${contactsQuarterly.total} contacts in ${year}`,
   );
 
   // Enrich deals with owner names and stage labels
@@ -937,12 +943,11 @@ export async function getComprehensiveData(
     stageSummary[stage].totalValue += deal.amount;
   }
 
-  // Calculate quarterly breakdowns for 2025
-  const currentYear = new Date().getFullYear();
+  // Calculate quarterly breakdowns for the specified year
   const getQuarter = (dateStr: string | null) => {
     if (!dateStr) return null;
     const date = new Date(dateStr);
-    if (date.getFullYear() !== currentYear) return null;
+    if (date.getFullYear() !== year) return null;
     const month = date.getMonth();
     if (month < 3) return "Q1";
     if (month < 6) return "Q2";
@@ -950,12 +955,12 @@ export async function getComprehensiveData(
     return "Q4";
   };
 
-  // Use 2025 quarterly contacts from search API (accurate server-side filtering)
+  // Use quarterly contacts from search API (accurate server-side filtering)
   const contactsByQuarter = {
-    Q1: contacts2025Quarterly.Q1,
-    Q2: contacts2025Quarterly.Q2,
-    Q3: contacts2025Quarterly.Q3,
-    Q4: contacts2025Quarterly.Q4,
+    Q1: contactsQuarterly.Q1,
+    Q2: contactsQuarterly.Q2,
+    Q3: contactsQuarterly.Q3,
+    Q4: contactsQuarterly.Q4,
   };
 
   // Deals by quarter (based on create date)
@@ -992,16 +997,16 @@ export async function getComprehensiveData(
         name,
       })),
       quarterly: {
-        year: currentYear,
+        year: year,
         contacts: contactsByQuarter,
         deals: dealsByQuarter,
         dealValue: dealValueByQuarter,
         companies: companiesByQuarter,
         websiteSessions: {
-          Q1: websiteSessionsQuarterly.Q1,
-          Q2: websiteSessionsQuarterly.Q2,
-          Q3: websiteSessionsQuarterly.Q3,
-          Q4: websiteSessionsQuarterly.Q4,
+          Q1: websiteSessionsData.Q1,
+          Q2: websiteSessionsData.Q2,
+          Q3: websiteSessionsData.Q3,
+          Q4: websiteSessionsData.Q4,
         },
       },
     },

@@ -217,11 +217,11 @@ CRITICAL: Reference the exact numbers from VERIFIED DATA. Do not invent any new 
     },
     // Quarterly KPI data for the table (SERVER calculated)
     kpiTable: {
-      year: new Date().getFullYear(),
+      year: quarterly.year,
       rows: [
         {
           metric: "Website Sessions",
-          subtext: `Website sessions from HubSpot (${new Date().getFullYear()} only)`,
+          subtext: `Website sessions from HubSpot (${quarterly.year} only) - Requires business-intelligence scope`,
           yearEndProjection: quarterly.websiteSessions.Q1 + quarterly.websiteSessions.Q2 + quarterly.websiteSessions.Q3 + quarterly.websiteSessions.Q4,
           q1: { projection: '-', actual: quarterly.websiteSessions.Q1 },
           q2: { projection: '-', actual: quarterly.websiteSessions.Q2 },
@@ -231,7 +231,7 @@ CRITICAL: Reference the exact numbers from VERIFIED DATA. Do not invent any new 
         },
         {
           metric: "New Contacts",
-          subtext: `Contacts created in HubSpot (${new Date().getFullYear()} only)`,
+          subtext: `Contacts created in HubSpot (${quarterly.year} only)`,
           yearEndProjection: quarterly.contacts.Q1 + quarterly.contacts.Q2 + quarterly.contacts.Q3 + quarterly.contacts.Q4,
           q1: { projection: '-', actual: quarterly.contacts.Q1 },
           q2: { projection: '-', actual: quarterly.contacts.Q2 },

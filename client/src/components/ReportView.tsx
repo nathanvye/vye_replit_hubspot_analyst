@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download, RefreshCw, AlertCircle, ExternalLink } from "lucide-react";
 import { motion } from "framer-motion";
 import { KPITable } from "./KPITable";
@@ -62,11 +63,15 @@ interface ReportData {
   };
 }
 
+const currentYear = new Date().getFullYear();
+const availableYears = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3];
+
 export function ReportView() {
   const { selectedAccount, conversationId } = useAuth();
   const [report, setReport] = useState<ReportData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
 
   const handleGenerateReport = async () => {
     if (!selectedAccount) {
@@ -78,7 +83,7 @@ export function ReportView() {
     setError(null);
 
     try {
-      const result = await api.generateReport(conversationId || "", selectedAccount);
+      const result = await api.generateReport(conversationId || "", selectedAccount, selectedYear);
       if (result.reportData) {
         setReport(result.reportData);
       } else {
@@ -112,8 +117,26 @@ export function ReportView() {
             <div>
               <h2 className="text-2xl font-bold mb-2">Generate HubSpot Report</h2>
               <p className="text-muted-foreground max-w-md mx-auto">
-                Click below to analyze your HubSpot data and generate a comprehensive report with real metrics from your CRM.
+                Select a year and click below to analyze your HubSpot data and generate a comprehensive report with real metrics from your CRM.
               </p>
+            </div>
+            <div className="flex items-center justify-center gap-3">
+              <span className="text-sm font-medium text-muted-foreground">Report Year:</span>
+              <Select 
+                value={selectedYear.toString()} 
+                onValueChange={(value) => setSelectedYear(parseInt(value))}
+              >
+                <SelectTrigger className="w-[120px]" data-testid="select-year">
+                  <SelectValue placeholder="Select year" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableYears.map((year) => (
+                    <SelectItem key={year} value={year.toString()} data-testid={`option-year-${year}`}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             {error && (
               <div className="flex items-center justify-center gap-2 text-destructive">
@@ -130,12 +153,12 @@ export function ReportView() {
               {isLoading ? (
                 <>
                   <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Analyzing HubSpot Data...
+                  Analyzing HubSpot Data for {selectedYear}...
                 </>
               ) : (
                 <>
                   <Download className="w-4 h-4 mr-2" />
-                  Generate Report
+                  Generate {selectedYear} Report
                 </>
               )}
             </Button>
@@ -157,7 +180,22 @@ export function ReportView() {
           </h1>
           <p className="text-xl text-muted-foreground">{report.subtitle}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3">
+          <Select 
+            value={selectedYear.toString()} 
+            onValueChange={(value) => setSelectedYear(parseInt(value))}
+          >
+            <SelectTrigger className="w-[100px]" data-testid="select-year-header">
+              <SelectValue placeholder="Year" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableYears.map((year) => (
+                <SelectItem key={year} value={year.toString()}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button 
             variant="outline" 
             size="sm" 

@@ -118,11 +118,11 @@ export const api = {
     return res.json();
   },
 
-  async generateReport(conversationId: string, hubspotAccountId: string): Promise<any> {
+  async generateReport(conversationId: string, hubspotAccountId: string, year?: number): Promise<any> {
     const res = await fetch("/api/reports/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ conversationId, hubspotAccountId }),
+      body: JSON.stringify({ conversationId, hubspotAccountId, year }),
     });
     if (!res.ok) throw new Error("Failed to generate report");
     return res.json();

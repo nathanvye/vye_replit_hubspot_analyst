@@ -10,7 +10,7 @@ import {
   getComprehensiveData,
   getFormByGuid,
   getAllForms,
-  getFormSubmissions2025Quarterly
+  getFormSubmissionsQuarterly
 } from "./hubspot-client";
 import { analyzeWithAI, generateReport, extractLearning } from "./ai-service";
 import { encrypt, decrypt } from "./encryption";
@@ -376,7 +376,8 @@ export async function registerRoutes(
 
   app.post("/api/reports/generate", async (req, res) => {
     try {
-      const { conversationId, hubspotAccountId } = req.body;
+      const { conversationId, hubspotAccountId, year } = req.body;
+      const reportYear = year || new Date().getFullYear();
 
       const apiKey = await getApiKeyForAccount(hubspotAccountId);
       
@@ -384,11 +385,11 @@ export async function registerRoutes(
         return res.status(400).json({ error: "HubSpot account not configured or API key missing" });
       }
 
-      // Use comprehensive data with pre-calculated summaries
-      const hubspotData = await getComprehensiveData(apiKey);
+      // Use comprehensive data with pre-calculated summaries for the specified year
+      const hubspotData = await getComprehensiveData(apiKey, undefined, reportYear);
       const learnedContext = await storage.getLearnedContextByAccount(hubspotAccountId);
       
-      // Fetch form submissions for saved forms
+      // Fetch form submissions for saved forms for the specified year
       const savedForms = await storage.getFormsByAccount(hubspotAccountId);
       const formSubmissionsData: Array<{
         formName: string;
@@ -401,7 +402,7 @@ export async function registerRoutes(
       }> = [];
       
       for (const form of savedForms) {
-        const submissions = await getFormSubmissions2025Quarterly(apiKey, form.formGuid);
+        const submissions = await getFormSubmissionsQuarterly(apiKey, form.formGuid, reportYear);
         formSubmissionsData.push({
           formName: form.formName,
           formGuid: form.formGuid,
