@@ -887,10 +887,8 @@ export async function getComprehensiveData(
       console.error(`${year} contacts fetch error:`, e.body?.message || e.message);
       return { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
     }),
-    getWebsiteSessionsQuarterly(apiKey, year).catch((e) => {
-      console.error("Website sessions fetch error:", e.body?.message || e.message);
-      return { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0, status: `Error: ${e.message}` };
-    }),
+    // Website sessions tracking removed for now
+    Promise.resolve({ Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 }),
   ]);
 
   console.log(
@@ -1042,13 +1040,6 @@ export async function getComprehensiveData(
         deals: dealsByQuarter,
         dealValue: dealValueByQuarter,
         companies: companiesByQuarter,
-        websiteSessions: {
-          Q1: websiteSessionsData.Q1,
-          Q2: websiteSessionsData.Q2,
-          Q3: websiteSessionsData.Q3,
-          Q4: websiteSessionsData.Q4,
-        },
-        websiteSessionsStatus: websiteSessionsData.status,
       },
     },
   };

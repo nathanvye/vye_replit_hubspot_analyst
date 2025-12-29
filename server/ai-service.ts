@@ -221,16 +221,6 @@ CRITICAL: Reference the exact numbers from VERIFIED DATA. Do not invent any new 
       year: quarterly.year,
       rows: [
         {
-          metric: "Website Sessions",
-          subtext: quarterly.websiteSessionsStatus || `Website sessions from HubSpot Reports API (${quarterly.year})`,
-          yearEndProjection: quarterly.websiteSessions.Q1 + quarterly.websiteSessions.Q2 + quarterly.websiteSessions.Q3 + quarterly.websiteSessions.Q4,
-          q1: { projection: '-', actual: quarterly.websiteSessions.Q1 },
-          q2: { projection: '-', actual: quarterly.websiteSessions.Q2 },
-          q3: { projection: '-', actual: quarterly.websiteSessions.Q3 },
-          q4: { projection: '-', actual: quarterly.websiteSessions.Q4 },
-          goal: ''
-        },
-        {
           metric: "New Contacts",
           subtext: `Contacts created in HubSpot (${quarterly.year} only)`,
           yearEndProjection: quarterly.contacts.Q1 + quarterly.contacts.Q2 + quarterly.contacts.Q3 + quarterly.contacts.Q4,
