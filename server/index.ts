@@ -1,7 +1,9 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { setupPassport, passport } from "./passport";
 
 const app = express();
 const httpServer = createServer(app);
@@ -9,6 +11,12 @@ const httpServer = createServer(app);
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
+  }
+}
+
+declare module "express-session" {
+  interface SessionData {
+    userId?: string;
   }
 }
 
@@ -21,6 +29,28 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+const sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret) {
+  console.warn("SESSION_SECRET not set. Using a random secret for this session.");
+}
+
+app.use(
+  session({
+    secret: sessionSecret || require("crypto").randomBytes(32).toString("hex"),
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    },
+  })
+);
+
+setupPassport();
+app.use(passport.initialize());
+app.use(passport.session());
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {

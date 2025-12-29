@@ -23,6 +23,7 @@ export const db = drizzle(pool, { schema });
 export interface IStorage {
   // Users
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserById(id: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   
   // HubSpot Accounts
@@ -61,6 +62,11 @@ class Storage implements IStorage {
   // Users
   async getUserByEmail(email: string): Promise<User | undefined> {
     const result = await db.select().from(schema.users).where(eq(schema.users.email, email)).limit(1);
+    return result[0];
+  }
+
+  async getUserById(id: string): Promise<User | undefined> {
+    const result = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
     return result[0];
   }
 

@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { passport } from "./passport";
 import { 
   getDeals, 
   getContacts, 
@@ -51,11 +52,67 @@ export async function registerRoutes(
         user = await storage.createUser({ email, name });
       }
 
+      req.session.userId = user.id;
       res.json({ user });
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ error: "Login failed" });
     }
+  });
+
+  // Google OAuth routes
+  app.get("/api/auth/google", passport.authenticate("google", {
+    scope: ["profile", "email"],
+    prompt: "select_account",
+  }));
+
+  app.get("/api/auth/google/callback",
+    passport.authenticate("google", {
+      failureRedirect: "/?error=auth_failed",
+    }),
+    (req, res) => {
+      const user = req.user as any;
+      if (user) {
+        req.session.userId = user.id;
+      }
+      res.redirect("/select-account");
+    }
+  );
+
+  // Get current session user
+  app.get("/api/auth/me", async (req, res) => {
+    try {
+      if (req.user) {
+        return res.json({ user: req.user });
+      }
+      
+      if (req.session.userId) {
+        const user = await storage.getUserById(req.session.userId);
+        if (user) {
+          return res.json({ user });
+        }
+      }
+      
+      res.json({ user: null });
+    } catch (error) {
+      console.error("Session check error:", error);
+      res.json({ user: null });
+    }
+  });
+
+  // Logout route
+  app.post("/api/auth/logout", (req, res) => {
+    req.logout((err) => {
+      if (err) {
+        console.error("Logout error:", err);
+      }
+      req.session.destroy((err) => {
+        if (err) {
+          console.error("Session destroy error:", err);
+        }
+        res.json({ success: true });
+      });
+    });
   });
 
   // ==========================================
