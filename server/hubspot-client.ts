@@ -706,72 +706,8 @@ export async function getContactsQuarterly(
   return results;
 }
 
-// Cache for discovered traffic report ID
-let cachedTrafficReportId: string | null = null;
-
-// Step 1: GET /reports/v2/reports to list available reports
-async function discoverTrafficReportId(apiKey: string): Promise<string | null> {
-  if (cachedTrafficReportId) {
-    console.log(`Using cached traffic report ID: ${cachedTrafficReportId}`);
-    return cachedTrafficReportId;
-  }
-
-  try {
-    console.log("Step 1: GET https://api.hubapi.com/reports/v2/reports");
-    
-    const response = await fetch("https://api.hubapi.com/reports/v2/reports", {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Accept": "application/json",
-      },
-    });
-
-    console.log(`Reports API response status: ${response.status}`);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Reports API error (${response.status}):`, errorText.substring(0, 500));
-      return null;
-    }
-
-    const data = await response.json();
-    const reports = data.results || data || [];
-    console.log(`Found ${Array.isArray(reports) ? reports.length : 'unknown'} reports`);
-    
-    if (Array.isArray(reports)) {
-      console.log("Available reports:");
-      for (const report of reports) {
-        console.log(`  - "${report.name}" (ID: ${report.id})`);
-      }
-      
-      // Look for traffic/sessions reports by name
-      const trafficKeywords = ['session', 'traffic', 'source', 'visit', 'total'];
-      
-      for (const report of reports) {
-        const name = (report.name || '').toLowerCase();
-        if (trafficKeywords.some(keyword => name.includes(keyword))) {
-          console.log(`Found traffic report: "${report.name}" (ID: ${report.id})`);
-          cachedTrafficReportId = report.id;
-          return report.id;
-        }
-      }
-      
-      // If no match, use the first report if available
-      if (reports.length > 0) {
-        console.log(`No traffic-specific report found. Using first report: "${reports[0].name}" (ID: ${reports[0].id})`);
-        cachedTrafficReportId = reports[0].id;
-        return reports[0].id;
-      }
-    }
-
-    console.log("No reports found.");
-    return null;
-  } catch (error: any) {
-    console.error("Error listing reports:", error.message);
-    return null;
-  }
-}
+// Traffic report ID for website sessions
+const TRAFFIC_REPORT_ID = "157824153";
 
 // Step 2: POST /reports/v2/reports/{REPORT_ID}/data with date range
 async function runReportForDateRange(
@@ -836,9 +772,8 @@ async function runReportForDateRange(
 
 // Get website sessions by quarter for a specific year
 // Uses Reports API v2:
-// Step 1: GET /reports/v2/reports to find traffic report
-// Step 2: POST /reports/v2/reports/{id}/data with date range per quarter
-// Step 3: Sum all values from data array
+// POST /reports/v2/reports/{REPORT_ID}/data with date range per quarter
+// Sum all values from data array
 export async function getWebsiteSessionsQuarterly(
   apiKey: string,
   year: number = new Date().getFullYear(),
@@ -847,14 +782,7 @@ export async function getWebsiteSessionsQuarterly(
     Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 
   };
 
-  // Step 1: Find traffic report
-  const reportId = await discoverTrafficReportId(apiKey);
-  
-  if (!reportId) {
-    console.log("No traffic report found - website sessions will show as 0");
-    results.status = "No traffic report found. Check server logs for details.";
-    return results;
-  }
+  console.log(`Fetching website sessions for ${year} using report ID: ${TRAFFIC_REPORT_ID}`);
 
   // Define quarter boundaries (YYYY-MM-DD format)
   const quarters = {
@@ -873,8 +801,8 @@ export async function getWebsiteSessionsQuarterly(
     }
     quarterIndex++;
 
-    // Step 2 & 3: Run report and sum values
-    const sessions = await runReportForDateRange(apiKey, reportId, range.start, range.end);
+    // Run report and sum values
+    const sessions = await runReportForDateRange(apiKey, TRAFFIC_REPORT_ID, range.start, range.end);
     if (quarter === 'Q1') results.Q1 = sessions;
     else if (quarter === 'Q2') results.Q2 = sessions;
     else if (quarter === 'Q3') results.Q3 = sessions;
