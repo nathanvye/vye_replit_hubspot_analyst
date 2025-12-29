@@ -827,12 +827,20 @@ export async function getPipelineStages(
   const stageMap = new Map<string, { label: string; probability: number }>();
 
   try {
-    const response: any = await client.apiRequest({
+    const httpResponse: any = await client.apiRequest({
       method: "GET",
       path: "/crm/v3/pipelines/deals",
     });
+    
+    // Parse the response - apiRequest returns a Response object
+    const response = typeof httpResponse.json === 'function' 
+      ? await httpResponse.json() 
+      : httpResponse;
+
+    console.log(`Fetched ${response.results?.length || 0} pipelines`);
 
     for (const pipeline of response.results || []) {
+      console.log(`Pipeline: ${pipeline.label} (${pipeline.id}) with ${pipeline.stages?.length || 0} stages`);
       for (const stage of pipeline.stages || []) {
         stageMap.set(stage.id, {
           label: stage.label,
@@ -840,8 +848,11 @@ export async function getPipelineStages(
             ? parseFloat(stage.metadata.probability)
             : 0,
         });
+        console.log(`  Stage: ${stage.id} -> ${stage.label}`);
       }
     }
+    
+    console.log(`Total stages mapped: ${stageMap.size}`);
   } catch (error: any) {
     console.error(
       "Error fetching pipelines:",
