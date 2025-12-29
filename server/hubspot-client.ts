@@ -706,72 +706,155 @@ export async function getContactsQuarterly(
   return results;
 }
 
-// Get website sessions for a date range using Analytics API v2
-// Endpoint: GET /analytics/v2/reports/totals/total?start=YYYYMMDD&end=YYYYMMDD
-async function getAnalyticsSessionsForRange(
-  client: any,
+// Cache for discovered traffic report ID
+let cachedTrafficReportId: string | null = null;
+
+// Step 1: GET /reports/v2/reports to list available reports
+async function discoverTrafficReportId(apiKey: string): Promise<string | null> {
+  if (cachedTrafficReportId) {
+    console.log(`Using cached traffic report ID: ${cachedTrafficReportId}`);
+    return cachedTrafficReportId;
+  }
+
+  try {
+    console.log("Step 1: GET https://api.hubapi.com/reports/v2/reports");
+    
+    const response = await fetch("https://api.hubapi.com/reports/v2/reports", {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Accept": "application/json",
+      },
+    });
+
+    console.log(`Reports API response status: ${response.status}`);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Reports API error (${response.status}):`, errorText.substring(0, 500));
+      return null;
+    }
+
+    const data = await response.json();
+    const reports = data.results || data || [];
+    console.log(`Found ${Array.isArray(reports) ? reports.length : 'unknown'} reports`);
+    
+    if (Array.isArray(reports)) {
+      console.log("Available reports:");
+      for (const report of reports) {
+        console.log(`  - "${report.name}" (ID: ${report.id})`);
+      }
+      
+      // Look for traffic/sessions reports by name
+      const trafficKeywords = ['session', 'traffic', 'source', 'visit', 'total'];
+      
+      for (const report of reports) {
+        const name = (report.name || '').toLowerCase();
+        if (trafficKeywords.some(keyword => name.includes(keyword))) {
+          console.log(`Found traffic report: "${report.name}" (ID: ${report.id})`);
+          cachedTrafficReportId = report.id;
+          return report.id;
+        }
+      }
+      
+      // If no match, use the first report if available
+      if (reports.length > 0) {
+        console.log(`No traffic-specific report found. Using first report: "${reports[0].name}" (ID: ${reports[0].id})`);
+        cachedTrafficReportId = reports[0].id;
+        return reports[0].id;
+      }
+    }
+
+    console.log("No reports found.");
+    return null;
+  } catch (error: any) {
+    console.error("Error listing reports:", error.message);
+    return null;
+  }
+}
+
+// Step 2: POST /reports/v2/reports/{REPORT_ID}/data with date range
+async function runReportForDateRange(
+  apiKey: string,
+  reportId: string,
   startDate: string,
   endDate: string
 ): Promise<number> {
   try {
-    // Convert YYYY-MM-DD to YYYYMMDD format for Analytics API
-    const start = startDate.replace(/-/g, '');
-    const end = endDate.replace(/-/g, '');
+    console.log(`Step 2: POST https://api.hubapi.com/reports/v2/reports/${reportId}/data`);
+    console.log(`  Date range: ${startDate} to ${endDate}`);
     
-    console.log(`Fetching analytics sessions for ${start} to ${end}...`);
-    
-    const httpResponse: any = await client.apiRequest({
-      method: "GET",
-      path: `/analytics/v2/reports/totals/total?start=${start}&end=${end}`,
+    const response = await fetch(`https://api.hubapi.com/reports/v2/reports/${reportId}/data`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      body: JSON.stringify({
+        startDate,
+        endDate,
+      }),
     });
 
-    const response = await httpResponse.json();
-    console.log(`Analytics response:`, JSON.stringify(response, null, 2).substring(0, 500));
+    console.log(`Report data response status: ${response.status}`);
     
-    // Extract sessions from response
-    // Response format: { "totals": { "sessions": 12345, ... }, ... }
-    let sessions = 0;
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Report data API error (${response.status}):`, errorText.substring(0, 500));
+      return 0;
+    }
+
+    const data = await response.json();
+    console.log(`Report data response:`, JSON.stringify(data, null, 2).substring(0, 1000));
     
-    if (response.totals?.sessions !== undefined) {
-      sessions = response.totals.sessions;
-    } else if (response.sessions !== undefined) {
-      sessions = response.sessions;
-    } else if (response.visits !== undefined) {
-      sessions = response.visits;
-    } else if (Array.isArray(response) && response.length > 0) {
-      // Sum sessions from array response
-      for (const item of response) {
-        sessions += item.sessions || item.visits || 0;
+    // Step 3: Sum all values from the data array
+    let totalSessions = 0;
+    
+    if (data.data && Array.isArray(data.data)) {
+      for (const row of data.data) {
+        const value = row.value || row.sessions || row.visits || row.count || 0;
+        if (typeof value === 'number') {
+          totalSessions += value;
+        } else if (typeof value === 'string') {
+          totalSessions += parseInt(value, 10) || 0;
+        }
       }
+      console.log(`Step 3: Summed ${data.data.length} sources = ${totalSessions} total sessions`);
+    } else if (data.totals?.sessions !== undefined) {
+      totalSessions = data.totals.sessions;
+    } else if (data.total !== undefined) {
+      totalSessions = data.total;
     }
     
-    console.log(`Sessions for ${start}-${end}: ${sessions}`);
-    return sessions;
+    return totalSessions;
   } catch (error: any) {
-    const errorMsg = error.body?.message || error.message || String(error);
-    console.error(`Analytics API error for ${startDate}-${endDate}:`, errorMsg);
-    
-    // Check if this is a scope/permission error
-    if (errorMsg.includes('403') || errorMsg.includes('forbidden') || errorMsg.includes('scope')) {
-      console.log("Analytics API may require additional scopes or Marketing Hub subscription");
-    }
-    
+    console.error(`Error running report for ${startDate}-${endDate}:`, error.message);
     return 0;
   }
 }
 
 // Get website sessions by quarter for a specific year
-// Uses Analytics API v2: GET /analytics/v2/reports/totals/total?start=YYYYMMDD&end=YYYYMMDD
-// Note: Analytics API may require Marketing Hub subscription
+// Uses Reports API v2:
+// Step 1: GET /reports/v2/reports to find traffic report
+// Step 2: POST /reports/v2/reports/{id}/data with date range per quarter
+// Step 3: Sum all values from data array
 export async function getWebsiteSessionsQuarterly(
   apiKey: string,
   year: number = new Date().getFullYear(),
 ): Promise<{ Q1: number; Q2: number; Q3: number; Q4: number; total: number; status?: string }> {
-  const client = createHubSpotClient(apiKey);
-
   const results: { Q1: number; Q2: number; Q3: number; Q4: number; total: number; status?: string } = { 
     Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 
   };
+
+  // Step 1: Find traffic report
+  const reportId = await discoverTrafficReportId(apiKey);
+  
+  if (!reportId) {
+    console.log("No traffic report found - website sessions will show as 0");
+    results.status = "No traffic report found. Check server logs for details.";
+    return results;
+  }
 
   // Define quarter boundaries (YYYY-MM-DD format)
   const quarters = {
@@ -781,7 +864,6 @@ export async function getWebsiteSessionsQuarterly(
     Q4: { start: `${year}-10-01`, end: `${year}-12-31` },
   };
 
-  let hasError = false;
   let quarterIndex = 0;
   
   for (const [quarter, range] of Object.entries(quarters)) {
@@ -791,22 +873,18 @@ export async function getWebsiteSessionsQuarterly(
     }
     quarterIndex++;
 
-    const sessions = await getAnalyticsSessionsForRange(client, range.start, range.end);
+    // Step 2 & 3: Run report and sum values
+    const sessions = await runReportForDateRange(apiKey, reportId, range.start, range.end);
     if (quarter === 'Q1') results.Q1 = sessions;
     else if (quarter === 'Q2') results.Q2 = sessions;
     else if (quarter === 'Q3') results.Q3 = sessions;
     else if (quarter === 'Q4') results.Q4 = sessions;
     results.total += sessions;
     console.log(`${year} ${quarter} website sessions: ${sessions}`);
-    
-    // If first quarter fails, set status and continue
-    if (quarterIndex === 1 && sessions === 0) {
-      hasError = true;
-    }
   }
 
-  if (hasError && results.total === 0) {
-    results.status = "Analytics API may require Marketing Hub. Sessions not available.";
+  if (results.total === 0) {
+    results.status = "Sessions returned 0. Check server logs for API response details.";
   }
 
   console.log(`Total ${year} website sessions: ${results.total}`);
