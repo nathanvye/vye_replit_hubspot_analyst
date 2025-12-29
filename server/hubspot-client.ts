@@ -706,136 +706,63 @@ export async function getContactsQuarterly(
   return results;
 }
 
-// Cache for discovered traffic report ID
-let cachedTrafficReportId: string | null = null;
-
-// Configurable traffic report ID (can be set via environment variable)
-const CONFIGURED_TRAFFIC_REPORT_ID = process.env.HUBSPOT_TRAFFIC_REPORT_ID || null;
-
-// Step 1: Find traffic report from GET /reports/v2/reports
-async function discoverTrafficReportId(client: any): Promise<string | null> {
-  // Use configured ID if provided
-  if (CONFIGURED_TRAFFIC_REPORT_ID) {
-    console.log(`Using configured traffic report ID: ${CONFIGURED_TRAFFIC_REPORT_ID}`);
-    return CONFIGURED_TRAFFIC_REPORT_ID;
-  }
-  
-  if (cachedTrafficReportId) {
-    return cachedTrafficReportId;
-  }
-
-  try {
-    console.log("Step 1: Listing available reports from GET /reports/v2/reports...");
-    const httpResponse: any = await client.apiRequest({
-      method: "GET",
-      path: "/reports/v2/reports",
-    });
-
-    const response = await httpResponse.json();
-    const reports = response.results || response || [];
-    console.log(`Found ${Array.isArray(reports) ? reports.length : 'unknown'} reports`);
-    
-    // Log all reports for debugging
-    if (Array.isArray(reports)) {
-      console.log("Available reports:");
-      for (const report of reports) {
-        console.log(`  - "${report.name}" (ID: ${report.id}, category: ${report.category || 'unknown'})`);
-      }
-      
-      // Look for traffic/sessions reports by name or category
-      const trafficKeywords = ['session', 'traffic', 'source', 'visit', 'analytics'];
-      const trafficCategories = ['traffic', 'analytics', 'web'];
-      
-      for (const report of reports) {
-        const name = (report.name || '').toLowerCase();
-        const category = (report.category || '').toLowerCase();
-        
-        // Check category first
-        if (trafficCategories.some(cat => category.includes(cat))) {
-          console.log(`Found traffic report by category: "${report.name}" (ID: ${report.id})`);
-          cachedTrafficReportId = report.id;
-          return report.id;
-        }
-        
-        // Then check name
-        if (trafficKeywords.some(keyword => name.includes(keyword))) {
-          console.log(`Found traffic report by name: "${report.name}" (ID: ${report.id})`);
-          cachedTrafficReportId = report.id;
-          return report.id;
-        }
-      }
-    }
-
-    console.log("No traffic report found automatically.");
-    console.log("Set HUBSPOT_TRAFFIC_REPORT_ID environment variable with a report ID from the list above.");
-    return null;
-  } catch (error: any) {
-    console.error("Error listing reports:", error.body?.message || error.message);
-    return null;
-  }
-}
-
-// Step 2 & 3: Run report for a date range and sum all source values
-async function runReportForDateRange(
+// Get website sessions for a date range using Analytics API v2
+// Endpoint: GET /analytics/v2/reports/totals/total?start=YYYYMMDD&end=YYYYMMDD
+async function getAnalyticsSessionsForRange(
   client: any,
-  reportId: string,
   startDate: string,
   endDate: string
 ): Promise<number> {
   try {
-    console.log(`Step 2: Running report ${reportId} for ${startDate} to ${endDate}...`);
+    // Convert YYYY-MM-DD to YYYYMMDD format for Analytics API
+    const start = startDate.replace(/-/g, '');
+    const end = endDate.replace(/-/g, '');
+    
+    console.log(`Fetching analytics sessions for ${start} to ${end}...`);
     
     const httpResponse: any = await client.apiRequest({
-      method: "POST",
-      path: `/reports/v2/reports/${reportId}/data`,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        startDate,
-        endDate,
-      }),
+      method: "GET",
+      path: `/analytics/v2/reports/totals/total?start=${start}&end=${end}`,
     });
 
     const response = await httpResponse.json();
-    console.log(`Report response:`, JSON.stringify(response, null, 2).substring(0, 1000));
+    console.log(`Analytics response:`, JSON.stringify(response, null, 2).substring(0, 500));
     
-    // Step 3: Sum all values from the data array
-    // Response format: { "data": [{ "dimension": "Organic Search", "value": 12450 }, ...] }
-    let totalSessions = 0;
+    // Extract sessions from response
+    // Response format: { "totals": { "sessions": 12345, ... }, ... }
+    let sessions = 0;
     
-    if (response.data && Array.isArray(response.data)) {
-      for (const row of response.data) {
-        // Sum the 'value' field from each source
-        const value = row.value || row.sessions || row.visits || row.count || 0;
-        if (typeof value === 'number') {
-          totalSessions += value;
-        } else if (typeof value === 'string') {
-          totalSessions += parseInt(value, 10) || 0;
-        }
+    if (response.totals?.sessions !== undefined) {
+      sessions = response.totals.sessions;
+    } else if (response.sessions !== undefined) {
+      sessions = response.sessions;
+    } else if (response.visits !== undefined) {
+      sessions = response.visits;
+    } else if (Array.isArray(response) && response.length > 0) {
+      // Sum sessions from array response
+      for (const item of response) {
+        sessions += item.sessions || item.visits || 0;
       }
-      console.log(`Step 3: Summed ${response.data.length} sources = ${totalSessions} total sessions`);
-    } else if (response.totals?.sessions !== undefined) {
-      totalSessions = response.totals.sessions;
-      console.log(`Found totals.sessions: ${totalSessions}`);
-    } else if (response.totals?.visits !== undefined) {
-      totalSessions = response.totals.visits;
-      console.log(`Found totals.visits: ${totalSessions}`);
-    } else if (response.total !== undefined) {
-      totalSessions = response.total;
-      console.log(`Found total: ${totalSessions}`);
     }
     
-    return totalSessions;
+    console.log(`Sessions for ${start}-${end}: ${sessions}`);
+    return sessions;
   } catch (error: any) {
-    console.error(`Error running report for ${startDate}-${endDate}:`, error.body?.message || error.message);
+    const errorMsg = error.body?.message || error.message || String(error);
+    console.error(`Analytics API error for ${startDate}-${endDate}:`, errorMsg);
+    
+    // Check if this is a scope/permission error
+    if (errorMsg.includes('403') || errorMsg.includes('forbidden') || errorMsg.includes('scope')) {
+      console.log("Analytics API may require additional scopes or Marketing Hub subscription");
+    }
+    
     return 0;
   }
 }
 
 // Get website sessions by quarter for a specific year
-// Uses Reports API: GET /reports/v2/reports to find report, then POST /reports/v2/reports/{id}/data
-// Requires 'Reports → Read' scope in HubSpot Private App
+// Uses Analytics API v2: GET /analytics/v2/reports/totals/total?start=YYYYMMDD&end=YYYYMMDD
+// Note: Analytics API may require Marketing Hub subscription
 export async function getWebsiteSessionsQuarterly(
   apiKey: string,
   year: number = new Date().getFullYear(),
@@ -846,16 +773,7 @@ export async function getWebsiteSessionsQuarterly(
     Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 
   };
 
-  // Step 1: Find traffic report
-  const reportId = await discoverTrafficReportId(client);
-  
-  if (!reportId) {
-    console.log("No traffic report found - website sessions will show as 0");
-    results.status = "No traffic report found. Set HUBSPOT_TRAFFIC_REPORT_ID or ensure Reports → Read scope is enabled.";
-    return results;
-  }
-
-  // Define quarter boundaries (YYYY-MM-DD format for Reports API)
+  // Define quarter boundaries (YYYY-MM-DD format)
   const quarters = {
     Q1: { start: `${year}-01-01`, end: `${year}-03-31` },
     Q2: { start: `${year}-04-01`, end: `${year}-06-30` },
@@ -863,7 +781,9 @@ export async function getWebsiteSessionsQuarterly(
     Q4: { start: `${year}-10-01`, end: `${year}-12-31` },
   };
 
+  let hasError = false;
   let quarterIndex = 0;
+  
   for (const [quarter, range] of Object.entries(quarters)) {
     // Add delay between quarters to avoid rate limiting
     if (quarterIndex > 0) {
@@ -871,13 +791,22 @@ export async function getWebsiteSessionsQuarterly(
     }
     quarterIndex++;
 
-    const sessions = await runReportForDateRange(client, reportId, range.start, range.end);
+    const sessions = await getAnalyticsSessionsForRange(client, range.start, range.end);
     if (quarter === 'Q1') results.Q1 = sessions;
     else if (quarter === 'Q2') results.Q2 = sessions;
     else if (quarter === 'Q3') results.Q3 = sessions;
     else if (quarter === 'Q4') results.Q4 = sessions;
     results.total += sessions;
     console.log(`${year} ${quarter} website sessions: ${sessions}`);
+    
+    // If first quarter fails, set status and continue
+    if (quarterIndex === 1 && sessions === 0) {
+      hasError = true;
+    }
+  }
+
+  if (hasError && results.total === 0) {
+    results.status = "Analytics API may require Marketing Hub. Sessions not available.";
   }
 
   console.log(`Total ${year} website sessions: ${results.total}`);

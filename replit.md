@@ -85,18 +85,17 @@ For full functionality, ensure your HubSpot Private App has these scopes enabled
 - `reports` - Read reports (required for website sessions)
 
 ### Website Sessions Configuration
-Website sessions use the HubSpot Reports API (not Analytics API v2 which is unavailable for Private Apps).
+Website sessions use the HubSpot Analytics API v2.
 
 **How it works:**
-1. The app calls `GET /reports/v2/reports` to list available reports
-2. It looks for a traffic/sessions report by name or category
-3. For each quarter, it calls `POST /reports/v2/reports/{id}/data` with date range
-4. It sums all source values to get total sessions per quarter
+1. For each quarter, the app calls `GET /analytics/v2/reports/totals/total?start=YYYYMMDD&end=YYYYMMDD`
+2. It extracts the `sessions` value from the response
+3. Values are summed per quarter for the selected year
 
-**Optional configuration:**
-- `HUBSPOT_TRAFFIC_REPORT_ID` - Set this environment variable to specify a specific report ID instead of auto-discovery. Useful if auto-discovery doesn't find the right report.
+**Requirements:**
+- HubSpot Marketing Hub subscription may be required for Analytics API access
+- If sessions show 0, check server logs for API error messages
 
 **Troubleshooting:**
-- If sessions show 0, check that your Private App has the `reports` scope
-- Check server logs to see available reports and their IDs
-- Create a "Sessions by source" report in HubSpot if one doesn't exist
+- If sessions always show 0, the Analytics API may not be available for your HubSpot subscription
+- The KPI table will show a warning message if sessions data is unavailable
