@@ -706,25 +706,108 @@ export async function getContactsQuarterly(
   return results;
 }
 
+// Cache for discovered traffic report ID
+let cachedTrafficReportId: string | null = null;
+
+// Configurable traffic report ID (can be set via environment variable)
+const CONFIGURED_TRAFFIC_REPORT_ID = process.env.HUBSPOT_TRAFFIC_REPORT_ID || null;
+
+// Get the configured traffic report ID (only explicit configuration is supported)
+async function discoverTrafficReportId(client: any): Promise<string | null> {
+  // Only explicit configuration is supported - auto-discovery is unreliable
+  if (CONFIGURED_TRAFFIC_REPORT_ID) {
+    console.log(`Using configured traffic report ID: ${CONFIGURED_TRAFFIC_REPORT_ID}`);
+    return CONFIGURED_TRAFFIC_REPORT_ID;
+  }
+  
+  return null;
+}
+
+// Run a report to get session data for a date range
+async function runReportForDateRange(
+  client: any,
+  reportId: string,
+  startDate: string,
+  endDate: string
+): Promise<number> {
+  try {
+    const httpResponse: any = await client.apiRequest({
+      method: "POST",
+      path: `/reports/v2/reports/${reportId}/data`,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        startDate,
+        endDate,
+      }),
+    });
+
+    const response = await httpResponse.json();
+    console.log(`Report ${reportId} response for ${startDate}-${endDate}:`, JSON.stringify(response, null, 2).substring(0, 500));
+    
+    // Extract session count from report data
+    // The structure varies by report type, so we try multiple paths
+    let sessions = 0;
+    
+    if (response.totals?.sessions !== undefined) {
+      sessions = response.totals.sessions;
+    } else if (response.totals?.visits !== undefined) {
+      sessions = response.totals.visits;
+    } else if (response.data && Array.isArray(response.data)) {
+      // Sum up sessions from data rows
+      for (const row of response.data) {
+        sessions += row.sessions || row.visits || 0;
+      }
+    } else if (response.total !== undefined) {
+      sessions = response.total;
+    }
+    
+    console.log(`Extracted sessions: ${sessions}`);
+    return sessions;
+  } catch (error: any) {
+    console.error(`Error running report for ${startDate}-${endDate}:`, error.body?.message || error.message);
+    return 0;
+  }
+}
+
 // Get website sessions by quarter for a specific year
-// NOTE: This requires the 'business-intelligence' scope in the HubSpot Private App.
-// If you see all zeros, ensure the Private App has this scope enabled.
-// Go to Settings → Integrations → Private Apps → Edit → Scopes → Enable 'business-intelligence'
+// NOTE: This uses the Reports API which requires 'Reports → Read' permission in Private App.
+// The Analytics API v2 (/analytics/v2/reports/sources/total) is NOT available for Private Apps.
+// Website sessions require explicit configuration via HUBSPOT_TRAFFIC_REPORT_ID environment variable.
 export async function getWebsiteSessionsQuarterly(
   apiKey: string,
   year: number = new Date().getFullYear(),
-): Promise<{ Q1: number; Q2: number; Q3: number; Q4: number; total: number }> {
+): Promise<{ Q1: number; Q2: number; Q3: number; Q4: number; total: number; status?: string }> {
   const client = createHubSpotClient(apiKey);
 
-  // Define quarter boundaries for the specified year (format: YYYYMMDD for v2 API)
-  const quarters = {
-    Q1: { start: `${year}0101`, end: `${year}0331` },
-    Q2: { start: `${year}0401`, end: `${year}0630` },
-    Q3: { start: `${year}0701`, end: `${year}0930` },
-    Q4: { start: `${year}1001`, end: `${year}1231` },
+  const results: { Q1: number; Q2: number; Q3: number; Q4: number; total: number; status?: string } = { 
+    Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 
   };
 
-  const results = { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
+  // Require explicit configuration - auto-discovery is unreliable
+  if (!CONFIGURED_TRAFFIC_REPORT_ID) {
+    console.log("HUBSPOT_TRAFFIC_REPORT_ID not configured - website sessions unavailable");
+    results.status = "Not configured - Set HUBSPOT_TRAFFIC_REPORT_ID to enable website sessions";
+    return results;
+  }
+
+  // Try to discover a traffic report (now only uses configured ID)
+  const reportId = await discoverTrafficReportId(client);
+  
+  if (!reportId) {
+    console.log("No traffic report found - website sessions will show as 0");
+    results.status = "Report not found - verify HUBSPOT_TRAFFIC_REPORT_ID is correct";
+    return results;
+  }
+
+  // Define quarter boundaries (YYYY-MM-DD format for Reports API)
+  const quarters = {
+    Q1: { start: `${year}-01-01`, end: `${year}-03-31` },
+    Q2: { start: `${year}-04-01`, end: `${year}-06-30` },
+    Q3: { start: `${year}-07-01`, end: `${year}-09-30` },
+    Q4: { start: `${year}-10-01`, end: `${year}-12-31` },
+  };
 
   let quarterIndex = 0;
   for (const [quarter, range] of Object.entries(quarters)) {
@@ -734,42 +817,13 @@ export async function getWebsiteSessionsQuarterly(
     }
     quarterIndex++;
 
-    try {
-      // Use Analytics API v2 which provides traffic/session data
-      const httpResponse: any = await client.apiRequest({
-        method: "GET",
-        path: "/analytics/v2/reports/sources/total",
-        qs: {
-          start: range.start,
-          end: range.end,
-        },
-      });
-
-      // apiRequest returns a fetch Response object - need to parse JSON
-      const response = await httpResponse.json();
-      console.log(
-        `API response for ${quarter}:`,
-        JSON.stringify(response, null, 2),
-      );
-
-      // The v2 API returns 'visits' which is equivalent to sessions
-      let quarterSessions = 0;
-      if (response.totals && response.totals.visits !== undefined) {
-        quarterSessions = response.totals.visits;
-      }
-
-      results[quarter as keyof typeof results] = quarterSessions;
-      results.total += quarterSessions;
-      console.log(
-        `${year} ${quarter} website sessions::: ${quarterSessions}`,
-      );
-    } catch (error: any) {
-      console.error(
-        `Error fetching ${quarter} website sessions:`,
-        error.body?.message || error.message,
-      );
-      // Continue with 0 for this quarter if there's an error
-    }
+    const sessions = await runReportForDateRange(client, reportId, range.start, range.end);
+    if (quarter === 'Q1') results.Q1 = sessions;
+    else if (quarter === 'Q2') results.Q2 = sessions;
+    else if (quarter === 'Q3') results.Q3 = sessions;
+    else if (quarter === 'Q4') results.Q4 = sessions;
+    results.total += sessions;
+    console.log(`${year} ${quarter} website sessions: ${sessions}`);
   }
 
   console.log(`Total ${year} website sessions: ${results.total}`);
@@ -844,13 +898,9 @@ export async function getComprehensiveData(
       console.error(`${year} contacts fetch error:`, e.body?.message || e.message);
       return { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
     }),
-    getWebsiteSessionsQuarterly(apiKey, year).catch((e) => {
-      console.error(
-        "Website sessions fetch error:",
-        e.body?.message || e.message,
-      );
-      return { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
-    }),
+    // Website sessions fetch removed - HubSpot Reports API requires payload-specific integration
+    // Will be reintroduced when a verified solution is available
+    Promise.resolve({ Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 }),
   ]);
 
   console.log(
@@ -1002,11 +1052,12 @@ export async function getComprehensiveData(
         deals: dealsByQuarter,
         dealValue: dealValueByQuarter,
         companies: companiesByQuarter,
+        // Website sessions removed - HubSpot Reports API requires payload-specific integration
         websiteSessions: {
-          Q1: websiteSessionsData.Q1,
-          Q2: websiteSessionsData.Q2,
-          Q3: websiteSessionsData.Q3,
-          Q4: websiteSessionsData.Q4,
+          Q1: 0,
+          Q2: 0,
+          Q3: 0,
+          Q4: 0,
         },
       },
     },

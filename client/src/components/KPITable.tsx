@@ -97,7 +97,17 @@ export function KPITable({ rows, year = 2025, formSubmissions = [] }: KPITablePr
                   {row.metric}
                 </div>
                 {row.subtext && (
-                  <div className="text-xs text-muted-foreground">{row.subtext}</div>
+                  <div className={cn(
+                    "text-xs",
+                    row.subtext.toLowerCase().includes('no ') || 
+                    row.subtext.toLowerCase().includes('error') || 
+                    row.subtext.toLowerCase().includes('unavailable') || 
+                    row.subtext.toLowerCase().includes('create a')
+                      ? "text-amber-600 font-medium" 
+                      : "text-muted-foreground"
+                  )}>
+                    {row.subtext}
+                  </div>
                 )}
                 {row.yoyChange && (
                   <div className={cn(

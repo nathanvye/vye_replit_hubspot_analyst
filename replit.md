@@ -74,3 +74,14 @@ Preferred communication style: Simple, everyday language.
 - `AI_INTEGRATIONS_OPENAI_API_KEY` - OpenAI API key
 - `AI_INTEGRATIONS_OPENAI_BASE_URL` - OpenAI API base URL (optional, for custom endpoints)
 - `ENCRYPTION_KEY` or `SESSION_SECRET` - Used for encrypting stored API keys
+
+### HubSpot Private App Required Scopes
+For full functionality, ensure your HubSpot Private App has these scopes enabled:
+- `crm.objects.contacts.read` - Read contacts
+- `crm.objects.deals.read` - Read deals
+- `crm.objects.companies.read` - Read companies
+- `crm.schemas.deals.read` - Read deal pipelines/stages
+- `forms` - Read form submissions
+
+### Notes on Website Sessions
+Website sessions data is currently not available through the HubSpot Private App integration. The HubSpot Analytics API v2 requires internal-only scopes, and the Reports API requires payload-specific integration that varies by account configuration. This feature is deferred pending a verified solution.
