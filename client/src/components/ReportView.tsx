@@ -5,10 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, RefreshCw, AlertCircle, ExternalLink } from "lucide-react";
+import { Download, RefreshCw, AlertCircle, ExternalLink, FileText } from "lucide-react";
 import { motion } from "framer-motion";
 import { KPITable } from "./KPITable";
 import { cn } from "@/lib/utils";
+import { exportReportToWord } from "@/lib/exportToWord";
 
 interface KPIRow {
   metric: string;
@@ -70,8 +71,22 @@ export function ReportView() {
   const { selectedAccount, conversationId } = useAuth();
   const [report, setReport] = useState<ReportData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+
+  const handleExportToWord = async () => {
+    if (!report) return;
+    setIsExporting(true);
+    try {
+      await exportReportToWord(report);
+    } catch (err: any) {
+      console.error("Export error:", err);
+      setError("Failed to export report to Word");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const handleGenerateReport = async () => {
     if (!selectedAccount) {
@@ -205,6 +220,16 @@ export function ReportView() {
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
+          </Button>
+          <Button 
+            variant="default" 
+            size="sm" 
+            onClick={handleExportToWord}
+            disabled={isExporting || isLoading}
+            data-testid="button-export-word"
+          >
+            <FileText className={`w-4 h-4 mr-2 ${isExporting ? 'animate-pulse' : ''}`} />
+            {isExporting ? 'Exporting...' : 'Export to Word'}
           </Button>
         </div>
       </div>
