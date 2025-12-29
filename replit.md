@@ -40,9 +40,13 @@ Preferred communication style: Simple, everyday language.
   - Reports (generated analysis documents)
 
 ### Authentication
-- Email-based authentication restricted to `@vye.agency` domain
-- No password required (internal tool assumption)
-- Session-based auth with user context stored in React Context
+- **Google SSO**: Primary authentication via Google OAuth 2.0
+  - Restricted to `@vye.agency` domain only
+  - Uses Passport.js with passport-google-oauth20 strategy
+  - Requires Google Cloud Console OAuth credentials
+- **Email fallback**: Simple email-based login (no password)
+- Session-based auth with express-session middleware
+- User context stored in React Context with session restoration
 
 ### Security
 - HubSpot API keys encrypted at rest using AES-256-GCM
@@ -73,7 +77,10 @@ Preferred communication style: Simple, everyday language.
 - `DATABASE_URL` - PostgreSQL connection string
 - `AI_INTEGRATIONS_OPENAI_API_KEY` - OpenAI API key
 - `AI_INTEGRATIONS_OPENAI_BASE_URL` - OpenAI API base URL (optional, for custom endpoints)
-- `ENCRYPTION_KEY` or `SESSION_SECRET` - Used for encrypting stored API keys
+- `SESSION_SECRET` - Used for session encryption
+- `GOOGLE_CLIENT_ID` - Google OAuth 2.0 Client ID
+- `GOOGLE_CLIENT_SECRET` - Google OAuth 2.0 Client Secret
+- `ENCRYPTION_KEY` - Used for encrypting stored HubSpot API keys (falls back to SESSION_SECRET)
 
 ### HubSpot Private App Required Scopes
 For full functionality, ensure your HubSpot Private App has these scopes enabled:
