@@ -95,6 +95,16 @@ ${learnedContextPrompt}`;
   return response.choices[0]?.message?.content || 'I apologize, but I was unable to generate a response.';
 }
 
+// Helper to format currency with commas
+function formatCurrency(value: number): string {
+  return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// Helper to format number with commas
+function formatNumber(value: number): string {
+  return value.toLocaleString('en-US');
+}
+
 export async function generateReport(hubspotData: any, context: LearnedContext[]): Promise<any> {
   const learnedContextPrompt = context.length > 0
     ? `\n\nCustom terminology:\n${context.map(lc => `- ${lc.key}: ${lc.value}`).join('\n')}`
@@ -136,8 +146,10 @@ export async function generateReport(hubspotData: any, context: LearnedContext[]
   const currentMonth = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
 
   // Build text descriptions for AI to analyze (AI only generates narratives)
-  const stageDescription = dealsByStage.map(s => `${s.stage}: ${s.count} deals worth $${s.value.toFixed(2)}`).join(', ');
-  const ownerDescription = dealsByOwner.map(o => `${o.owner}: ${o.count} deals worth $${o.value.toFixed(2)}`).join(', ');
+  // Sort by value descending to highlight top stages
+  const stagesSorted = [...dealsByStage].sort((a, b) => b.value - a.value);
+  const stageDescription = stagesSorted.map(s => `${s.stage} (${formatNumber(s.count)} deals, ${formatCurrency(s.value)})`).join('\n- ');
+  const ownerDescription = dealsByOwner.map(o => `${o.owner}: ${formatNumber(o.count)} deals, ${formatCurrency(o.value)}`).join(', ');
 
   // Build quarterly description for AI context
   const quarterlyDesc = summary.quarterly ? 
@@ -164,46 +176,47 @@ export async function generateReport(hubspotData: any, context: LearnedContext[]
   const prompt = `Analyze this HubSpot CRM data and write detailed insights in a SPECIFIC FORMAT.
 
 VERIFIED DATA (use these exact numbers - do NOT invent statistics):
-- Total Deals: ${dealCount}
-- Total Deal Value: $${totalDealValue.toFixed(2)}
-- Closed/Won Deals (YTD): ${closedWonDeals.length} worth $${closedWonValue.toFixed(2)}
-- Q${currentQuarter} Closed Deals: ${currentQuarterDeals.length} worth $${currentQuarterValue.toFixed(2)}
-- Open Deals in Pipeline: ${openDeals.length} worth $${openDealsValue.toFixed(2)}
-- Total Contacts: ${contactCount}
-- Total Companies: ${companyCount}
-- Deals by Stage: ${stageDescription || 'None'}
+- Total Deals: ${formatNumber(dealCount)}
+- Total Deal Value: ${formatCurrency(totalDealValue)}
+- Closed/Won Deals (YTD): ${formatNumber(closedWonDeals.length)} worth ${formatCurrency(closedWonValue)}
+- Q${currentQuarter} Closed Deals: ${formatNumber(currentQuarterDeals.length)} worth ${formatCurrency(currentQuarterValue)}
+- Open Deals in Pipeline: ${formatNumber(openDeals.length)} worth ${formatCurrency(openDealsValue)}
+- Total Contacts: ${formatNumber(contactCount)}
+- Total Companies: ${formatNumber(companyCount)}
+- Deals by Stage (sorted by value):
+- ${stageDescription || 'None'}
 - Deals by Owner: ${ownerDescription || 'None'}
 - Quarterly Breakdown (${currentYear}): ${quarterlyDesc}
 ${learnedContextPrompt}
 
 Return JSON with insights formatted like these examples:
 
-REVENUE GENERATION EXAMPLES (reference exact data):
-- "YTD ${closedWonDeals.length} closed-won deals with $${closedWonValue.toFixed(2)} can be attributed back to marketing."
-- "${currentQuarterDeals.length} of these worth $${currentQuarterValue.toFixed(2)} closed in Q${currentQuarter} so far."
-- "${openDeals.length} marketing attributed deals worth $${openDealsValue.toFixed(2)} is still open in the pipeline."
+REVENUE GENERATION EXAMPLES (reference exact data with commas):
+- "YTD ${formatNumber(closedWonDeals.length)} closed-won deals with ${formatCurrency(closedWonValue)} can be attributed back to marketing."
+- "${formatNumber(currentQuarterDeals.length)} of these worth ${formatCurrency(currentQuarterValue)} closed in Q${currentQuarter} so far."
+- "${formatNumber(openDeals.length)} marketing attributed deals worth ${formatCurrency(openDealsValue)} is still open in the pipeline."
 
-LEAD GENERATION EXAMPLES (reference exact data):
-- "YTD ${contactCount} new contacts created in HubSpot."
+LEAD GENERATION EXAMPLES (reference exact data with commas):
+- "YTD ${formatNumber(contactCount)} new contacts created in HubSpot."
 - Mention QoQ trends if quarterly data shows patterns
-- Reference specific conversion activities if available
+- Reference specific stage names and deal counts (not IDs)
 
 {
-  "revenueInsights": ["4-6 bullet points about revenue/deals using EXACT numbers from verified data - focus on YTD totals, Q${currentQuarter} specifics, and pipeline value"],
-  "leadGenInsights": ["4-6 bullet points about contacts/leads using EXACT numbers - mention QoQ trends, quarterly patterns, and contact growth"],
+  "revenueInsights": ["4-6 bullet points about revenue/deals using EXACT numbers with commas from verified data - focus on YTD totals, Q${currentQuarter} specifics, and pipeline value by stage"],
+  "leadGenInsights": ["4-6 bullet points about contacts/leads using EXACT numbers with commas - mention QoQ trends, quarterly patterns, and contact growth"],
   "recommendations": ["5-7 specific, actionable recommendations"]
 }
 
 RECOMMENDATIONS SHOULD BE SPECIFIC AND ACTIONABLE like these examples:
-- "Lean into [top product] to drive profitability. Could support with sales enablement messaging, battle cards, sell sheets, etc."
-- "Consider a [product] branch of the product identifier."
-- "[Product X] becoming a close runner-up to [Product Y] and often with larger deals. Lean heavy into this product in the next quarter."
+- "Lean into [top stage/product] to drive profitability. Could support with sales enablement messaging, battle cards, sell sheets, etc."
+- "Consider a [specific product] branch of the product identifier."
+- "[Stage/Product X] becoming a close runner-up to [Stage/Product Y] and often with larger deals. Lean heavy into this in the next quarter."
 - "Consider repurposing webinar content across social media and email campaigns to drive TOF contacts toward lower-funnel education."
 - "Contact growth patterns suggest a content offer or webinar specifically for [audience segment] may prove worthwhile."
-- Suggest specific campaign ideas (holiday campaigns, EOY pushes, exclusivity angles)
-- Reference specific products, deal types, or owner performance from the data
+- Suggest specific campaign ideas (holiday campaigns, EOY pushes, exclusivity angles) tied to deal value patterns
+- Reference specific stage names (not IDs), deal counts, or owner performance from the data
 
-CRITICAL: Every number you mention MUST come from the VERIFIED DATA above. Do not invent statistics. Recommendations should reference actual patterns in the data.`;
+CRITICAL: Every number you mention MUST include commas and come from the VERIFIED DATA above. Use stage names not IDs. Do not invent statistics. Recommendations should reference actual patterns in the data.`;
 
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',
