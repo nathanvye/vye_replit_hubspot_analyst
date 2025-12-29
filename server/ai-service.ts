@@ -147,28 +147,54 @@ export async function generateReport(hubspotData: any, context: LearnedContext[]
     `Q4: ${summary.quarterly.contacts.Q4} contacts, ${summary.quarterly.deals.Q4} deals ($${summary.quarterly.dealValue.Q4.toFixed(0)}).`
     : 'No quarterly data available';
 
-  const prompt = `Analyze this HubSpot CRM summary data and write insights.
+  // Get current year and quarter
+  const now = new Date();
+  const currentYear = summary.quarterly?.year || now.getFullYear();
+  const currentQuarter = Math.floor(now.getMonth() / 3) + 1;
+  
+  // Calculate Q4 specific deals (or current quarter)
+  const currentQuarterDeals = closedWonDeals.filter((d: any) => {
+    if (!d.closeDate) return false;
+    const closeDate = new Date(d.closeDate);
+    const dealQuarter = Math.floor(closeDate.getMonth() / 3) + 1;
+    return closeDate.getFullYear() === currentYear && dealQuarter === currentQuarter;
+  });
+  const currentQuarterValue = currentQuarterDeals.reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
 
-VERIFIED DATA (these are facts - do NOT make up other numbers):
+  const prompt = `Analyze this HubSpot CRM data and write detailed insights in a SPECIFIC FORMAT.
+
+VERIFIED DATA (use these exact numbers - do NOT invent statistics):
 - Total Deals: ${dealCount}
 - Total Deal Value: $${totalDealValue.toFixed(2)}
-- Closed/Won Deals: ${closedWonDeals.length} worth $${closedWonValue.toFixed(2)}
-- Open Deals: ${openDeals.length} worth $${openDealsValue.toFixed(2)}
+- Closed/Won Deals (YTD): ${closedWonDeals.length} worth $${closedWonValue.toFixed(2)}
+- Q${currentQuarter} Closed Deals: ${currentQuarterDeals.length} worth $${currentQuarterValue.toFixed(2)}
+- Open Deals in Pipeline: ${openDeals.length} worth $${openDealsValue.toFixed(2)}
 - Total Contacts: ${contactCount}
 - Total Companies: ${companyCount}
 - Deals by Stage: ${stageDescription || 'None'}
 - Deals by Owner: ${ownerDescription || 'None'}
-- Quarterly Breakdown (${summary.quarterly?.year || new Date().getFullYear()}): ${quarterlyDesc}
+- Quarterly Breakdown (${currentYear}): ${quarterlyDesc}
 ${learnedContextPrompt}
 
-Write ONLY narrative insights based on these numbers. Return JSON with ONLY these fields:
+Return JSON with insights formatted like these examples:
+
+REVENUE GENERATION EXAMPLES (reference exact data):
+- "YTD ${closedWonDeals.length} closed-won deals with $${closedWonValue.toFixed(2)} can be attributed back to marketing."
+- "${currentQuarterDeals.length} of these worth $${currentQuarterValue.toFixed(2)} closed in Q${currentQuarter} so far."
+- "${openDeals.length} marketing attributed deals worth $${openDealsValue.toFixed(2)} is still open in the pipeline."
+
+LEAD GENERATION EXAMPLES (reference exact data):
+- "YTD ${contactCount} new contacts created in HubSpot."
+- Mention QoQ trends if quarterly data shows patterns
+- Reference specific conversion activities if available
+
 {
-  "revenueInsights": ["3-5 bullet points analyzing revenue/deals using the exact numbers above"],
-  "leadGenInsights": ["3-5 bullet points analyzing contacts/leads using the exact numbers above"],
+  "revenueInsights": ["4-6 bullet points about revenue/deals using EXACT numbers from verified data - focus on YTD totals, Q${currentQuarter} specifics, and pipeline value"],
+  "leadGenInsights": ["4-6 bullet points about contacts/leads using EXACT numbers - mention QoQ trends, quarterly patterns, and contact growth"],
   "recommendations": ["3-5 actionable recommendations based on the data patterns"]
 }
 
-CRITICAL: Reference the exact numbers from VERIFIED DATA. Do not invent any new statistics.`;
+CRITICAL: Every number you mention MUST come from the VERIFIED DATA above. Do not invent statistics.`;
 
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',
