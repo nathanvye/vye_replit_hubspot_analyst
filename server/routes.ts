@@ -11,7 +11,9 @@ import {
   getComprehensiveData,
   getFormByGuid,
   getAllForms,
-  getFormSubmissionsQuarterly
+  getFormSubmissionsQuarterly,
+  getAllLists,
+  getListById
 } from "./hubspot-client";
 import { analyzeWithAI, generateReport, extractLearning } from "./ai-service";
 import { encrypt, decrypt } from "./encryption";
@@ -293,6 +295,93 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting form:", error);
       res.status(500).json({ error: "Failed to delete form" });
+    }
+  });
+
+  // ==========================================
+  // HubSpot Lists Management
+  // ==========================================
+
+  // Get all available lists from HubSpot (for picker UI)
+  app.get("/api/hubspot/available-lists/:accountId", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      
+      const apiKey = await getApiKeyForAccount(accountId);
+      if (!apiKey) {
+        return res.status(400).json({ error: "Could not find API key for account" });
+      }
+
+      const lists = await getAllLists(apiKey);
+      res.json(lists);
+    } catch (error) {
+      console.error("Error fetching available lists:", error);
+      res.status(500).json({ error: "Failed to fetch available lists from HubSpot" });
+    }
+  });
+
+  // Get saved lists for an account
+  app.get("/api/hubspot/lists/:accountId", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const lists = await storage.getListsByAccount(accountId);
+      res.json(lists);
+    } catch (error) {
+      console.error("Error fetching lists:", error);
+      res.status(500).json({ error: "Failed to fetch lists" });
+    }
+  });
+
+  // Add a list by ID (looks up list name from HubSpot)
+  const addListSchema = z.object({
+    accountId: z.string().min(1, "Account ID is required"),
+    listId: z.string().min(1, "List ID is required")
+  });
+
+  app.post("/api/hubspot/lists", async (req, res) => {
+    try {
+      const parseResult = addListSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: parseResult.error.errors[0]?.message || "Invalid request" });
+      }
+
+      const { accountId, listId } = parseResult.data;
+
+      // Get API key for this account
+      const apiKey = await getApiKeyForAccount(accountId);
+      if (!apiKey) {
+        return res.status(400).json({ error: "Could not find API key for account" });
+      }
+
+      // Look up list name from HubSpot
+      const listInfo = await getListById(apiKey, listId);
+      if ('error' in listInfo && !('name' in listInfo)) {
+        return res.status(400).json({ error: listInfo.error });
+      }
+
+      // Save the list
+      const list = await storage.createList({
+        hubspotAccountId: accountId,
+        listId: (listInfo as any).listId,
+        listName: (listInfo as any).name
+      });
+
+      res.json(list);
+    } catch (error) {
+      console.error("Error adding list:", error);
+      res.status(500).json({ error: "Failed to add list" });
+    }
+  });
+
+  // Delete a list
+  app.delete("/api/hubspot/lists/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteList(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting list:", error);
+      res.status(500).json({ error: "Failed to delete list" });
     }
   });
 

@@ -8,7 +8,8 @@ import type {
   InsertMessage, Message,
   InsertLearnedContext, LearnedContext,
   InsertReport, Report,
-  InsertHubspotForm, HubspotForm
+  InsertHubspotForm, HubspotForm,
+  InsertHubspotList, HubspotList
 } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 
@@ -56,6 +57,11 @@ export interface IStorage {
   getFormsByAccount(hubspotAccountId: string): Promise<HubspotForm[]>;
   createForm(form: InsertHubspotForm): Promise<HubspotForm>;
   deleteForm(id: string): Promise<void>;
+  
+  // HubSpot Lists
+  getListsByAccount(hubspotAccountId: string): Promise<HubspotList[]>;
+  createList(list: InsertHubspotList): Promise<HubspotList>;
+  deleteList(id: string): Promise<void>;
 }
 
 class Storage implements IStorage {
@@ -191,6 +197,23 @@ class Storage implements IStorage {
 
   async deleteForm(id: string): Promise<void> {
     await db.delete(schema.hubspotForms).where(eq(schema.hubspotForms.id, id));
+  }
+
+  // HubSpot Lists
+  async getListsByAccount(hubspotAccountId: string): Promise<HubspotList[]> {
+    return await db.select()
+      .from(schema.hubspotLists)
+      .where(eq(schema.hubspotLists.hubspotAccountId, hubspotAccountId))
+      .orderBy(desc(schema.hubspotLists.createdAt));
+  }
+
+  async createList(list: InsertHubspotList): Promise<HubspotList> {
+    const result = await db.insert(schema.hubspotLists).values(list).returning();
+    return result[0];
+  }
+
+  async deleteList(id: string): Promise<void> {
+    await db.delete(schema.hubspotLists).where(eq(schema.hubspotLists.id, id));
   }
 }
 

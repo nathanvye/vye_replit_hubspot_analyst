@@ -337,6 +337,103 @@ export async function getAllForms(
   return forms;
 }
 
+// Fetch all lists from HubSpot
+export async function getAllLists(
+  apiKey: string,
+): Promise<{ listId: string; name: string; size: number }[]> {
+  const client = createHubSpotClient(apiKey);
+  const lists: { listId: string; name: string; size: number }[] = [];
+
+  try {
+    let after: string | undefined;
+
+    do {
+      const httpResponse: any = await client.apiRequest({
+        method: "GET",
+        path: "/crm/v3/lists",
+        qs: { limit: 100, ...(after ? { after } : {}) },
+      });
+
+      const response = await httpResponse.json();
+      const results = response?.results || [];
+      console.log(`Found ${results.length} lists in this page`);
+
+      for (const list of results) {
+        lists.push({
+          listId: list.listId?.toString() || list.hs_list_id?.toString() || "",
+          name: list.name || "Unnamed List",
+          size: list.size || 0,
+        });
+      }
+
+      // Check for next page using cursor-based pagination
+      after = response?.paging?.next?.after;
+      
+      // Safety cap
+      if (lists.length >= 10000) {
+        console.log("Reached max lists limit, stopping pagination");
+        break;
+      }
+    } while (after);
+
+    console.log(`Total lists fetched: ${lists.length}`);
+
+    // Sort by name
+    lists.sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error: any) {
+    console.error(
+      "Error fetching all lists:",
+      error.body?.message || error.message,
+    );
+  }
+
+  return lists;
+}
+
+// Look up a list by its ID and return the list details
+export async function getListById(
+  apiKey: string,
+  listId: string,
+): Promise<
+  { listId: string; name: string; size: number; error?: string } | { error: string }
+> {
+  const client = createHubSpotClient(apiKey);
+
+  try {
+    const httpResponse: any = await client.apiRequest({
+      method: "GET",
+      path: `/crm/v3/lists/${listId}`,
+    });
+
+    const response = await httpResponse.json();
+
+    return {
+      listId: response.listId?.toString() || listId,
+      name: response.name || "Unknown List",
+      size: response.size || 0,
+    };
+  } catch (error: any) {
+    const status = error.code || error.response?.status || error.statusCode;
+    const message = error.body?.message || error.message || "Unknown error";
+
+    console.error(`Error fetching list by ID (${status}):`, message);
+
+    if (status === 404) {
+      return {
+        error: "List not found. Please check the list ID is correct.",
+      };
+    } else if (status === 401 || status === 403) {
+      return {
+        error: "Access denied. Your HubSpot API key may not have lists access.",
+      };
+    } else if (status === 429) {
+      return { error: "Rate limited. Please try again in a moment." };
+    } else {
+      return { error: `Failed to lookup list: ${message}` };
+    }
+  }
+}
+
 // Look up a form by its GUID and return the form name
 export async function getFormByGuid(
   apiKey: string,

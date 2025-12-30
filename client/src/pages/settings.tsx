@@ -19,7 +19,8 @@ import {
   LogOut,
   Menu,
   RefreshCw,
-  Search
+  Search,
+  Users
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -37,6 +38,20 @@ interface AvailableForm {
   createdAt: string;
 }
 
+interface HubspotList {
+  id: string;
+  hubspotAccountId: string;
+  listId: string;
+  listName: string;
+  createdAt: string;
+}
+
+interface AvailableList {
+  listId: string;
+  name: string;
+  size: number;
+}
+
 export default function SettingsPage() {
   const { user, selectedAccount, selectedAccountName, logout } = useAuth();
   const [, setLocation] = useLocation();
@@ -48,6 +63,16 @@ export default function SettingsPage() {
   const [isAddingForm, setIsAddingForm] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  
+  // Lists state
+  const [savedLists, setSavedLists] = useState<HubspotList[]>([]);
+  const [availableLists, setAvailableLists] = useState<AvailableList[]>([]);
+  const [selectedListId, setSelectedListId] = useState<string>("");
+  const [isLoadingLists, setIsLoadingLists] = useState(false);
+  const [isLoadingAvailableLists, setIsLoadingAvailableLists] = useState(false);
+  const [isAddingList, setIsAddingList] = useState(false);
+  const [listSearchQuery, setListSearchQuery] = useState<string>("");
+  
   const { toast } = useToast();
 
   useEffect(() => {
@@ -57,6 +82,8 @@ export default function SettingsPage() {
     }
     loadForms();
     loadAvailableForms();
+    loadLists();
+    loadAvailableLists();
   }, [user, selectedAccount, setLocation]);
 
   const loadForms = async () => {
@@ -179,6 +206,126 @@ export default function SettingsPage() {
     }
   };
 
+  // Lists functions
+  const loadLists = async () => {
+    if (!selectedAccount) return;
+    setIsLoadingLists(true);
+    try {
+      const response = await fetch(`/api/hubspot/lists/${selectedAccount}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSavedLists(data);
+      }
+    } catch (error) {
+      console.error("Failed to load lists:", error);
+    } finally {
+      setIsLoadingLists(false);
+    }
+  };
+
+  const loadAvailableLists = async () => {
+    if (!selectedAccount) return;
+    setIsLoadingAvailableLists(true);
+    try {
+      const response = await fetch(`/api/hubspot/available-lists/${selectedAccount}`);
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableLists(data);
+      } else {
+        toast({
+          title: "Warning",
+          description: "Could not load lists from HubSpot. You may not have lists access.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Failed to load available lists:", error);
+    } finally {
+      setIsLoadingAvailableLists(false);
+    }
+  };
+
+  const handleAddList = async () => {
+    if (!selectedListId || !selectedAccount) return;
+    
+    const list = availableLists.find(l => l.listId === selectedListId);
+    if (!list) return;
+
+    if (savedLists.some(l => l.listId === selectedListId)) {
+      toast({
+        title: "Already Added",
+        description: "This list is already in your list.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsAddingList(true);
+    try {
+      const response = await fetch("/api/hubspot/lists", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accountId: selectedAccount,
+          listId: selectedListId
+        })
+      });
+
+      if (response.ok) {
+        const newList = await response.json();
+        setSavedLists(prev => [newList, ...prev]);
+        setSelectedListId("");
+        toast({
+          title: "List Added",
+          description: `"${newList.listName}" has been added successfully.`
+        });
+      } else {
+        const error = await response.json();
+        toast({
+          title: "Error",
+          description: error.error || "Failed to add list",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add list. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsAddingList(false);
+    }
+  };
+
+  const handleDeleteList = async (listId: string, listName: string) => {
+    try {
+      const response = await fetch(`/api/hubspot/lists/${listId}`, {
+        method: "DELETE"
+      });
+
+      if (response.ok) {
+        setSavedLists(prev => prev.filter(l => l.id !== listId));
+        toast({
+          title: "List Removed",
+          description: `"${listName}" has been removed.`
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to remove list",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to remove list. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Filter out already-added forms from the dropdown
   const unaddedForms = availableForms.filter(
     af => !savedForms.some(sf => sf.formGuid === af.id)
@@ -189,6 +336,18 @@ export default function SettingsPage() {
     ? unaddedForms 
     : unaddedForms.filter(form => 
         form.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
+  // Filter out already-added lists from the dropdown
+  const unaddedLists = availableLists.filter(
+    al => !savedLists.some(sl => sl.listId === al.listId)
+  );
+
+  // Filter lists based on search query
+  const filteredLists = listSearchQuery.trim() === "" 
+    ? unaddedLists 
+    : unaddedLists.filter(list => 
+        list.name.toLowerCase().includes(listSearchQuery.toLowerCase())
       );
 
   const Sidebar = () => (
@@ -286,7 +445,7 @@ export default function SettingsPage() {
               animate={{ opacity: 1, y: 0 }}
             >
               <h1 className="text-2xl font-bold mb-2">Settings</h1>
-              <p className="text-muted-foreground">Configure HubSpot forms for report tracking</p>
+              <p className="text-muted-foreground">Configure HubSpot forms and lists for report tracking</p>
             </motion.div>
 
             <Card>
@@ -399,6 +558,126 @@ export default function SettingsPage() {
                           className="text-muted-foreground hover:text-destructive shrink-0"
                           onClick={() => handleDeleteForm(form.id, form.formName)}
                           data-testid={`button-delete-form-${form.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">HubSpot Lists</CardTitle>
+                    <CardDescription>
+                      Select lists/segments from your HubSpot account to track in reports.
+                    </CardDescription>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={loadAvailableLists}
+                    disabled={isLoadingAvailableLists}
+                    data-testid="button-refresh-lists"
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-2 ${isLoadingAvailableLists ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search lists by name..."
+                      value={listSearchQuery}
+                      onChange={(e) => setListSearchQuery(e.target.value)}
+                      disabled={isLoadingAvailableLists}
+                      className="pl-10"
+                      data-testid="input-search-lists"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Select 
+                    value={selectedListId} 
+                    onValueChange={setSelectedListId}
+                    disabled={isLoadingAvailableLists || isAddingList}
+                  >
+                    <SelectTrigger className="flex-1" data-testid="select-list">
+                      <SelectValue placeholder={
+                        isLoadingAvailableLists 
+                          ? "Loading lists..." 
+                          : unaddedLists.length === 0 
+                            ? "All lists added" 
+                            : filteredLists.length === 0
+                              ? "No matching lists"
+                              : "Select a list"
+                      } />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredLists.length === 0 ? (
+                        <div className="px-2 py-1.5 text-sm text-muted-foreground text-center">
+                          No lists found
+                        </div>
+                      ) : (
+                        filteredLists.map(list => (
+                          <SelectItem key={list.listId} value={list.listId}>
+                            {list.name} ({list.size.toLocaleString()} contacts)
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <Button 
+                    onClick={handleAddList} 
+                    disabled={!selectedListId || isAddingList}
+                    data-testid="button-add-list"
+                  >
+                    {isAddingList ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Plus className="w-4 h-4" />
+                    )}
+                  </Button>
+                </div>
+
+                {isLoadingLists ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : savedLists.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>No lists added yet</p>
+                    <p className="text-sm">Select a list above to get started</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {savedLists.map((list) => (
+                      <motion.div
+                        key={list.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border"
+                        data-testid={`list-item-${list.id}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate" data-testid={`text-list-name-${list.id}`}>{list.listName}</p>
+                          <p className="text-xs text-muted-foreground font-mono truncate">ID: {list.listId}</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground hover:text-destructive shrink-0"
+                          onClick={() => handleDeleteList(list.id, list.listName)}
+                          data-testid={`button-delete-list-${list.id}`}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>

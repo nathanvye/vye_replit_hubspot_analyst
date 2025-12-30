@@ -119,3 +119,19 @@ export const insertHubspotFormSchema = createInsertSchema(hubspotForms).omit({
 });
 export type InsertHubspotForm = z.infer<typeof insertHubspotFormSchema>;
 export type HubspotForm = typeof hubspotForms.$inferSelect;
+
+// HubSpot Lists - stores list IDs and names for report tracking
+export const hubspotLists = pgTable("hubspot_lists", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  hubspotAccountId: varchar("hubspot_account_id").notNull().references(() => hubspotAccounts.id, { onDelete: "cascade" }),
+  listId: text("list_id").notNull(),
+  listName: text("list_name").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertHubspotListSchema = createInsertSchema(hubspotLists).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type InsertHubspotList = z.infer<typeof insertHubspotListSchema>;
+export type HubspotList = typeof hubspotLists.$inferSelect;
