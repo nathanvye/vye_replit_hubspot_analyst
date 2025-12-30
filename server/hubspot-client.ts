@@ -345,36 +345,39 @@ export async function getAllLists(
   const lists: { listId: string; name: string; size: number }[] = [];
 
   try {
-    let after: string | undefined;
+    let offset = 0;
+    const count = 100;
+    let hasMore = true;
 
-    do {
+    while (hasMore) {
       const httpResponse: any = await client.apiRequest({
         method: "GET",
-        path: "/crm/v3/lists",
-        qs: { limit: 100, ...(after ? { after } : {}) },
+        path: "/crm/v3/lists/search",
+        qs: { count, offset },
       });
 
       const response = await httpResponse.json();
-      const results = response?.results || [];
-      console.log(`Found ${results.length} lists in this page`);
+      const results = response?.lists || [];
+      console.log(`Found ${results.length} lists in this page (offset: ${offset})`);
 
       for (const list of results) {
         lists.push({
-          listId: list.listId?.toString() || list.hs_list_id?.toString() || "",
+          listId: list.listId?.toString() || "",
           name: list.name || "Unnamed List",
           size: list.size || 0,
         });
       }
 
-      // Check for next page using cursor-based pagination
-      after = response?.paging?.next?.after;
+      // Check for more pages using offset-based pagination
+      hasMore = response?.hasMore === true;
+      offset = response?.offset !== undefined ? response.offset + count : offset + count;
       
       // Safety cap
       if (lists.length >= 10000) {
         console.log("Reached max lists limit, stopping pagination");
         break;
       }
-    } while (after);
+    }
 
     console.log(`Total lists fetched: ${lists.length}`);
 
