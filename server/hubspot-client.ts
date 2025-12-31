@@ -351,9 +351,13 @@ export async function getAllLists(
 
     while (hasMore) {
       const httpResponse: any = await client.apiRequest({
-        method: "GET",
+        method: "POST",
         path: "/crm/v3/lists/search",
-        qs: { count, offset },
+        body: {
+          count,
+          offset,
+          query: "",
+        },
       });
 
       const response = await httpResponse.json();
@@ -370,7 +374,7 @@ export async function getAllLists(
 
       // Check for more pages using offset-based pagination
       hasMore = response?.hasMore === true;
-      offset = response?.offset !== undefined ? response.offset + count : offset + count;
+      offset = response?.offset !== undefined ? response.offset : offset + count;
       
       // Safety cap
       if (lists.length >= 10000) {
