@@ -1,15 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, RefreshCw, AlertCircle, ExternalLink, FileText } from "lucide-react";
+import { Download, RefreshCw, AlertCircle, ExternalLink, FileText, Target } from "lucide-react";
 import { motion } from "framer-motion";
 import { KPITable } from "./KPITable";
 import { cn } from "@/lib/utils";
 import { exportReportToWord } from "@/lib/exportToWord";
+import { useQuery } from "@tanstack/react-query";
 
 interface KPIRow {
   metric: string;
@@ -127,6 +128,25 @@ export function ReportView() {
       maximumFractionDigits: 0
     }).format(num);
   };
+
+  const { data: kpiGoals } = useQuery<any[]>({
+    queryKey: [`/api/kpi-goals/${selectedAccount}`],
+    enabled: !!selectedAccount,
+  });
+
+  const enrichedKpiRows = (report?.kpiTable?.rows || []).map(row => {
+    const goals = kpiGoals?.find(g => g.metric === row.metric && g.year === (report?.kpiTable?.year || currentYear));
+    if (goals) {
+      return {
+        ...row,
+        q1Goal: goals.q1Goal,
+        q2Goal: goals.q2Goal,
+        q3Goal: goals.q3Goal,
+        q4Goal: goals.q4Goal,
+      };
+    }
+    return row;
+  });
 
   if (!report) {
     return (
@@ -252,10 +272,10 @@ export function ReportView() {
           </div>
         </div>
 
-        {report.kpiTable && report.kpiTable.rows.length > 0 ? (
+        {enrichedKpiRows.length > 0 ? (
           <KPITable 
-            rows={report.kpiTable.rows} 
-            year={report.kpiTable.year}
+            rows={enrichedKpiRows} 
+            year={report.kpiTable?.year}
             formSubmissions={report.formSubmissions}
             hubspotLists={report.hubspotLists}
           />

@@ -10,7 +10,8 @@ import type {
   InsertReport, Report,
   InsertHubspotForm, HubspotForm,
   InsertHubspotList, HubspotList,
-  InsertFormGoal, FormGoal
+  InsertFormGoal, FormGoal,
+  InsertKpiGoal, KpiGoal
 } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 
@@ -69,6 +70,11 @@ export interface IStorage {
   getFormGoalByFormAndYear(formId: string, year: number): Promise<FormGoal | undefined>;
   upsertFormGoal(goal: InsertFormGoal): Promise<FormGoal>;
   deleteFormGoalsByForm(formId: string): Promise<void>;
+
+  // KPI Goals
+  getKpiGoalsByAccount(hubspotAccountId: string): Promise<KpiGoal[]>;
+  getKpiGoalByAccountMetricAndYear(hubspotAccountId: string, metric: string, year: number): Promise<KpiGoal | undefined>;
+  upsertKpiGoal(goal: InsertKpiGoal): Promise<KpiGoal>;
 }
 
 class Storage implements IStorage {
@@ -152,7 +158,7 @@ class Storage implements IStorage {
   }
 
   async createMessage(message: InsertMessage): Promise<Message> {
-    const result = await db.insert(schema.messages).values(message).returning();
+    const result = await db.insert(schema.messages).values(message as any).returning();
     return result[0];
   }
 
@@ -262,6 +268,44 @@ class Storage implements IStorage {
 
   async deleteFormGoalsByForm(formId: string): Promise<void> {
     await db.delete(schema.formGoals).where(eq(schema.formGoals.formId, formId));
+  }
+
+  // KPI Goals
+  async getKpiGoalsByAccount(hubspotAccountId: string): Promise<KpiGoal[]> {
+    return await db.select()
+      .from(schema.kpiGoals)
+      .where(eq(schema.kpiGoals.hubspotAccountId, hubspotAccountId))
+      .orderBy(schema.kpiGoals.year);
+  }
+
+  async getKpiGoalByAccountMetricAndYear(hubspotAccountId: string, metric: string, year: number): Promise<KpiGoal | undefined> {
+    const result = await db.select()
+      .from(schema.kpiGoals)
+      .where(and(
+        eq(schema.kpiGoals.hubspotAccountId, hubspotAccountId),
+        eq(schema.kpiGoals.metric, metric),
+        eq(schema.kpiGoals.year, year)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async upsertKpiGoal(goal: InsertKpiGoal): Promise<KpiGoal> {
+    const existing = await this.getKpiGoalByAccountMetricAndYear(goal.hubspotAccountId, goal.metric, goal.year);
+    if (existing) {
+      const result = await db.update(schema.kpiGoals)
+        .set({
+          q1Goal: goal.q1Goal,
+          q2Goal: goal.q2Goal,
+          q3Goal: goal.q3Goal,
+          q4Goal: goal.q4Goal,
+        })
+        .where(eq(schema.kpiGoals.id, existing.id))
+        .returning();
+      return result[0];
+    }
+    const result = await db.insert(schema.kpiGoals).values(goal).returning();
+    return result[0];
   }
 }
 

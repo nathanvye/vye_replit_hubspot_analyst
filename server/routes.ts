@@ -443,6 +443,51 @@ export async function registerRoutes(
   });
 
   // ==========================================
+  // KPI Goals
+  // ==========================================
+
+  // Get goals for an account
+  app.get("/api/kpi-goals/:accountId", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const goals = await storage.getKpiGoalsByAccount(accountId);
+      res.json(goals);
+    } catch (error) {
+      console.error("Error fetching KPI goals:", error);
+      res.status(500).json({ error: "Failed to fetch KPI goals" });
+    }
+  });
+
+  const integerOrStringSchema = z.union([z.number().int(), z.string().regex(/^\d+$/).transform(v => parseInt(v))]);
+
+  // Create or update KPI goals
+  const kpiGoalSchema = z.object({
+    hubspotAccountId: z.string().min(1, "Account ID is required"),
+    metric: z.string().min(1, "Metric name is required"),
+    year: z.number().int().min(2020).max(2100),
+    q1Goal: integerOrStringSchema.optional().default(0),
+    q2Goal: integerOrStringSchema.optional().default(0),
+    q3Goal: integerOrStringSchema.optional().default(0),
+    q4Goal: integerOrStringSchema.optional().default(0),
+  });
+
+  // Since some KPI goals might be currency or large numbers, let's keep it simple with integers for now
+  app.post("/api/kpi-goals", async (req, res) => {
+    try {
+      const parseResult = kpiGoalSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: parseResult.error.errors[0]?.message || "Invalid request" });
+      }
+
+      const goal = await storage.upsertKpiGoal(parseResult.data);
+      res.json(goal);
+    } catch (error) {
+      console.error("Error saving KPI goal:", error);
+      res.status(500).json({ error: "Failed to save KPI goal" });
+    }
+  });
+
+  // ==========================================
   // Conversations
   // ==========================================
 

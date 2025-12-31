@@ -152,3 +152,21 @@ export const insertFormGoalSchema = createInsertSchema(formGoals).omit({
 });
 export type InsertFormGoal = z.infer<typeof insertFormGoalSchema>;
 export type FormGoal = typeof formGoals.$inferSelect;
+
+// KPI Goals - quarterly targets for overall metrics per year
+export const kpiGoals = pgTable("kpi_goals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  hubspotAccountId: varchar("hubspot_account_id").notNull().references(() => hubspotAccounts.id, { onDelete: "cascade" }),
+  metric: text("metric").notNull(), // "Contacts", "Sessions", etc.
+  year: integer("year").notNull(),
+  q1Goal: integer("q1_goal").default(0),
+  q2Goal: integer("q2_goal").default(0),
+  q3Goal: integer("q3_goal").default(0),
+  q4Goal: integer("q4_goal").default(0),
+});
+
+export const insertKpiGoalSchema = createInsertSchema(kpiGoals).omit({ 
+  id: true 
+});
+export type InsertKpiGoal = z.infer<typeof insertKpiGoalSchema>;
+export type KpiGoal = typeof kpiGoals.$inferSelect;

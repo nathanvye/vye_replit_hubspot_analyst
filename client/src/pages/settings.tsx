@@ -13,7 +13,6 @@ import {
   Plus,
   Trash2,
   FileText,
-  Loader2,
   BrainCircuit,
   Database,
   LogOut,
@@ -24,7 +23,8 @@ import {
   Target,
   ChevronDown,
   ChevronUp,
-  Save
+  Save,
+  Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -93,6 +93,123 @@ export default function SettingsPage() {
   const [selectedGoalYear, setSelectedGoalYear] = useState<number>(new Date().getFullYear());
   const [goalInputs, setGoalInputs] = useState<{ q1: string; q2: string; q3: string; q4: string }>({ q1: "", q2: "", q3: "", q4: "" });
   const [isSavingGoal, setIsSavingGoal] = useState(false);
+
+  // Overall KPI Goals state
+  const [editingKpi, setEditingKpi] = useState<string | null>(null);
+  const [kpiGoals, setKpiGoals] = useState<Record<string, any>>({});
+  const [isSavingKpiGoal, setIsSavingKpiGoal] = useState(false);
+
+  useEffect(() => {
+    if (!user || !selectedAccount) {
+      setLocation("/");
+      return;
+    }
+    loadForms();
+    loadAvailableForms();
+    loadLists();
+    loadAvailableLists();
+    loadKpiGoals();
+  }, [user, selectedAccount, setLocation]);
+
+  const loadKpiGoals = async () => {
+    if (!selectedAccount) return;
+    try {
+      const response = await fetch(`/api/kpi-goals/${selectedAccount}`);
+      if (response.ok) {
+        const data = await response.json();
+        const goalsMap: Record<string, any> = {};
+        data.forEach((g: any) => {
+          goalsMap[`${g.metric}-${g.year}`] = g;
+        });
+        setKpiGoals(goalsMap);
+      }
+    } catch (error) {
+      console.error("Failed to load KPI goals:", error);
+    }
+  };
+
+  const handleKpiGoalChange = (metric: string, year: number, quarter: string, value: string) => {
+    const key = `${metric}-${year}`;
+    setGoalInputs(prev => ({ ...prev, [quarter]: value }));
+  };
+
+  const handleToggleKpiGoals = (metric: string) => {
+    if (editingKpi === metric) {
+      setEditingKpi(null);
+      return;
+    }
+    
+    setEditingKpi(metric);
+    const key = `${metric}-${selectedGoalYear}`;
+    const goals = kpiGoals[key];
+    if (goals) {
+      setGoalInputs({
+        q1: goals.q1Goal?.toString() || "",
+        q2: goals.q2Goal?.toString() || "",
+        q3: goals.q3Goal?.toString() || "",
+        q4: goals.q4Goal?.toString() || ""
+      });
+    } else {
+      setGoalInputs({ q1: "", q2: "", q3: "", q4: "" });
+    }
+  };
+
+  const handleSaveKpiGoals = async (metric: string) => {
+    if (!selectedAccount) return;
+    setIsSavingKpiGoal(true);
+    try {
+      const response = await fetch("/api/kpi-goals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hubspotAccountId: selectedAccount,
+          metric,
+          year: selectedGoalYear,
+          q1Goal: goalInputs.q1 ? parseInt(goalInputs.q1) : 0,
+          q2Goal: goalInputs.q2 ? parseInt(goalInputs.q2) : 0,
+          q3Goal: goalInputs.q3 ? parseInt(goalInputs.q3) : 0,
+          q4Goal: goalInputs.q4 ? parseInt(goalInputs.q4) : 0
+        })
+      });
+
+      if (response.ok) {
+        const savedGoal = await response.json();
+        setKpiGoals(prev => ({
+          ...prev,
+          [`${metric}-${selectedGoalYear}`]: savedGoal
+        }));
+        toast({
+          title: "Goals Saved",
+          description: `Overall KPI goals for ${metric} (${selectedGoalYear}) have been saved.`
+        });
+        setEditingKpi(null);
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to save goals",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save goals. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSavingKpiGoal(false);
+    }
+  };
+
+  const kpiMetrics = [
+    "Contacts",
+    "Sessions",
+    "Qualified Leads",
+    "Total Deals",
+    "Total Deal Value",
+    "Closed Won Deals",
+    "Closed Won Value"
+  ];
   
   const { toast } = useToast();
 
@@ -385,19 +502,39 @@ export default function SettingsPage() {
     }
   };
 
-  const handleYearChange = (year: number, formId: string) => {
+  const handleYearChange = (year: number, sourceId?: string) => {
     setSelectedGoalYear(year);
-    const goals = formGoals[formId] || [];
-    const yearGoal = goals.find(g => g.year === year);
-    if (yearGoal) {
-      setGoalInputs({
-        q1: yearGoal.q1Goal?.toString() || "",
-        q2: yearGoal.q2Goal?.toString() || "",
-        q3: yearGoal.q3Goal?.toString() || "",
-        q4: yearGoal.q4Goal?.toString() || ""
-      });
-    } else {
-      setGoalInputs({ q1: "", q2: "", q3: "", q4: "" });
+    // If sourceId is provided, we update inputs for that specific source
+    if (sourceId) {
+      if (kpiMetrics.includes(sourceId)) {
+        // KPI Goal update
+        const key = `${sourceId}-${year}`;
+        const goals = kpiGoals[key];
+        if (goals) {
+          setGoalInputs({
+            q1: goals.q1Goal?.toString() || "",
+            q2: goals.q2Goal?.toString() || "",
+            q3: goals.q3Goal?.toString() || "",
+            q4: goals.q4Goal?.toString() || ""
+          });
+        } else {
+          setGoalInputs({ q1: "", q2: "", q3: "", q4: "" });
+        }
+      } else {
+        // Form Goal update
+        const goals = formGoals[sourceId] || [];
+        const yearGoal = goals.find((g: any) => g.year === year);
+        if (yearGoal) {
+          setGoalInputs({
+            q1: yearGoal.q1Goal?.toString() || "",
+            q2: yearGoal.q2Goal?.toString() || "",
+            q3: yearGoal.q3Goal?.toString() || "",
+            q4: yearGoal.q4Goal?.toString() || ""
+          });
+        } else {
+          setGoalInputs({ q1: "", q2: "", q3: "", q4: "" });
+        }
+      }
     }
   };
 
@@ -571,6 +708,139 @@ export default function SettingsPage() {
               <h1 className="text-2xl font-bold mb-2">Settings</h1>
               <p className="text-muted-foreground">Configure HubSpot forms and lists for report tracking</p>
             </motion.div>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">Overall KPI Goals</CardTitle>
+                    <CardDescription>
+                      Set quarterly goals for top-level performance metrics.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-4">
+                  {kpiMetrics.map((metric) => {
+                    const key = `${metric}-${selectedGoalYear}`;
+                    const goals = kpiGoals[key] || { q1Goal: 0, q2Goal: 0, q3Goal: 0, q4Goal: 0 };
+                    const isEditing = editingKpi === metric;
+                    const totalGoal = (goals.q1Goal || 0) + (goals.q2Goal || 0) + (goals.q3Goal || 0) + (goals.q4Goal || 0);
+
+                    return (
+                      <div key={metric} className="border rounded-lg overflow-hidden">
+                        <div className="flex items-center justify-between p-4 bg-muted/30">
+                          <div className="flex items-center gap-3">
+                            <Target className="w-5 h-5 text-primary" />
+                            <div>
+                              <p className="font-medium">{metric}</p>
+                              {!isEditing && (
+                                <p className="text-xs text-muted-foreground">
+                                  Total {selectedGoalYear} Goal: {totalGoal.toLocaleString()}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleToggleKpiGoals(metric)}
+                              data-testid={`button-toggle-kpi-goals-${metric}`}
+                            >
+                              {isEditing ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {isEditing && (
+                          <div className="p-4 border-t border-border space-y-4 bg-white">
+                            <div className="flex items-center gap-4">
+                              <div className="flex-1">
+                                <Label className="text-xs">Year</Label>
+                                <Select 
+                                  value={selectedGoalYear.toString()} 
+                                  onValueChange={(v) => handleYearChange(parseInt(v), metric)}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {yearOptions.map(y => (
+                                      <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label className="text-xs">Q1 Goal</Label>
+                                <Input
+                                  type="number"
+                                  value={goalInputs.q1}
+                                  onChange={(e) => handleKpiGoalChange(metric, selectedGoalYear, "q1", e.target.value)}
+                                  placeholder="0"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs">Q2 Goal</Label>
+                                <Input
+                                  type="number"
+                                  value={goalInputs.q2}
+                                  onChange={(e) => handleKpiGoalChange(metric, selectedGoalYear, "q2", e.target.value)}
+                                  placeholder="0"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs">Q3 Goal</Label>
+                                <Input
+                                  type="number"
+                                  value={goalInputs.q3}
+                                  onChange={(e) => handleKpiGoalChange(metric, selectedGoalYear, "q3", e.target.value)}
+                                  placeholder="0"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs">Q4 Goal</Label>
+                                <Input
+                                  type="number"
+                                  value={goalInputs.q4}
+                                  onChange={(e) => handleKpiGoalChange(metric, selectedGoalYear, "q4", e.target.value)}
+                                  placeholder="0"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="flex justify-end pt-2">
+                              <Button 
+                                size="sm" 
+                                onClick={() => handleSaveKpiGoals(metric)}
+                                disabled={isSavingKpiGoal}
+                              >
+                                {isSavingKpiGoal ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                                Save {selectedGoalYear} Goals
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {!isEditing && totalGoal > 0 && (
+                          <div className="px-4 pb-4 grid grid-cols-4 gap-2">
+                            <div className="text-[10px] uppercase text-muted-foreground">Q1: {goals.q1Goal?.toLocaleString()}</div>
+                            <div className="text-[10px] uppercase text-muted-foreground">Q2: {goals.q2Goal?.toLocaleString()}</div>
+                            <div className="text-[10px] uppercase text-muted-foreground">Q3: {goals.q3Goal?.toLocaleString()}</div>
+                            <div className="text-[10px] uppercase text-muted-foreground">Q4: {goals.q4Goal?.toLocaleString()}</div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
 
             <Card>
               <CardHeader>

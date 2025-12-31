@@ -15,6 +15,10 @@ interface KPIRow {
   q3: QuarterData;
   q4: QuarterData;
   goal: number | string;
+  q1Goal?: number;
+  q2Goal?: number;
+  q3Goal?: number;
+  q4Goal?: number;
 }
 
 interface FormSubmissionData {
@@ -54,18 +58,18 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
     return value;
   };
 
-  const getCellStyle = (actual: number | string | null, projection: number | string) => {
-    if (actual === null || actual === undefined || actual === '' || actual === '-') {
+  const getCellStyle = (actual: number | string | null, goal: number | string | undefined) => {
+    if (actual === null || actual === undefined || actual === '' || actual === '-' || goal === undefined || goal === null || goal === 0) {
       return '';
     }
     const actualNum = typeof actual === 'number' ? actual : parseFloat(String(actual));
-    const projNum = typeof projection === 'number' ? projection : parseFloat(String(projection));
+    const goalNum = typeof goal === 'number' ? goal : parseFloat(String(goal));
     
-    if (isNaN(actualNum) || isNaN(projNum)) return '';
+    if (isNaN(actualNum) || isNaN(goalNum)) return '';
     
-    if (actualNum >= projNum) {
+    if (actualNum >= goalNum) {
       return 'text-green-600 font-semibold';
-    } else if (actualNum < projNum * 0.9) {
+    } else if (actualNum < goalNum) {
       return 'text-red-600 font-semibold';
     }
     return '';
@@ -131,36 +135,46 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
                 )}
               </td>
               <td className="px-3 py-3 text-center font-bold">{formatValue(row.yearEndProjection)}</td>
-              <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">{formatValue(row.q1.projection)}</td>
+              <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">
+                {row.q1Goal ? formatValue(row.q1Goal) : formatValue(row.q1.projection)}
+              </td>
               <td className={cn(
                 "px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30",
-                getCellStyle(row.q1.actual, row.q1.projection)
+                getCellStyle(row.q1.actual, row.q1Goal)
               )}>
                 {formatValue(row.q1.actual)}
               </td>
-              <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">{formatValue(row.q2.projection)}</td>
+              <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">
+                {row.q2Goal ? formatValue(row.q2Goal) : formatValue(row.q2.projection)}
+              </td>
               <td className={cn(
                 "px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30",
-                getCellStyle(row.q2.actual, row.q2.projection)
+                getCellStyle(row.q2.actual, row.q2Goal)
               )}>
                 {formatValue(row.q2.actual)}
               </td>
-              <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">{formatValue(row.q3.projection)}</td>
+              <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">
+                {row.q3Goal ? formatValue(row.q3Goal) : formatValue(row.q3.projection)}
+              </td>
               <td className={cn(
                 "px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30",
-                getCellStyle(row.q3.actual, row.q3.projection)
+                getCellStyle(row.q3.actual, row.q3Goal)
               )}>
                 {formatValue(row.q3.actual)}
               </td>
-              <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">{formatValue(row.q4.projection)}</td>
+              <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">
+                {row.q4Goal ? formatValue(row.q4Goal) : formatValue(row.q4.projection)}
+              </td>
               <td className={cn(
                 "px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30",
-                getCellStyle(row.q4.actual, row.q4.projection)
+                getCellStyle(row.q4.actual, row.q4Goal)
               )}>
                 {formatValue(row.q4.actual)}
               </td>
               <td className="px-3 py-3 text-center bg-green-100 dark:bg-green-900/30 font-semibold">
-                {formatValue(row.goal)}
+                {row.q1Goal || row.q2Goal || row.q3Goal || row.q4Goal 
+                  ? formatValue((row.q1Goal || 0) + (row.q2Goal || 0) + (row.q3Goal || 0) + (row.q4Goal || 0))
+                  : formatValue(row.goal)}
               </td>
             </tr>
           ))}
