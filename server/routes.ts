@@ -602,14 +602,32 @@ export async function registerRoutes(
         Q3: number;
         Q4: number;
         total: number;
+        q1Goal: number;
+        q2Goal: number;
+        q3Goal: number;
+        q4Goal: number;
+        yearGoalTotal: number;
       }> = [];
       
       for (const form of savedForms) {
         const submissions = await getFormSubmissionsQuarterly(apiKey, form.formGuid, reportYear);
+        
+        // Fetch goals for this form and year
+        const formGoal = await storage.getFormGoalByFormAndYear(form.id, reportYear);
+        const q1Goal = formGoal?.q1Goal ?? 0;
+        const q2Goal = formGoal?.q2Goal ?? 0;
+        const q3Goal = formGoal?.q3Goal ?? 0;
+        const q4Goal = formGoal?.q4Goal ?? 0;
+        
         formSubmissionsData.push({
           formName: form.formName,
           formGuid: form.formGuid,
-          ...submissions
+          ...submissions,
+          q1Goal,
+          q2Goal,
+          q3Goal,
+          q4Goal,
+          yearGoalTotal: q1Goal + q2Goal + q3Goal + q4Goal
         });
       }
       

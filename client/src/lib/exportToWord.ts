@@ -39,6 +39,11 @@ interface FormSubmissionData {
   Q3: number;
   Q4: number;
   total: number;
+  q1Goal?: number;
+  q2Goal?: number;
+  q3Goal?: number;
+  q4Goal?: number;
+  yearGoalTotal?: number;
 }
 
 interface HubSpotListData {
@@ -237,6 +242,7 @@ const createKPITable = (rows: KPIRow[], year: number, formSubmissions: FormSubmi
   const formRows = formSubmissions.map((form, idx) => {
     const rowIndex = rows.length + idx;
     const bgColor = rowIndex % 2 === 0 ? "FFFFFF" : "F5F5F5";
+    const hasGoals = form.q1Goal || form.q2Goal || form.q3Goal || form.q4Goal;
     
     return new TableRow({
       children: [
@@ -265,15 +271,15 @@ const createKPITable = (rows: KPIRow[], year: number, formSubmissions: FormSubmi
           shading: { type: ShadingType.SOLID, color: bgColor },
         }),
         createDataCell("-", { bold: true, bgColor }),
-        createDataCell("-", { bgColor: "F3E8FF" }),
+        createDataCell(form.q1Goal ? formatValue(form.q1Goal) : "-", { bgColor: "F3E8FF" }),
         createDataCell(formatValue(form.Q1), { bold: true, bgColor: "E9D5FF" }),
-        createDataCell("-", { bgColor: "F3E8FF" }),
+        createDataCell(form.q2Goal ? formatValue(form.q2Goal) : "-", { bgColor: "F3E8FF" }),
         createDataCell(formatValue(form.Q2), { bold: true, bgColor: "E9D5FF" }),
-        createDataCell("-", { bgColor: "F3E8FF" }),
+        createDataCell(form.q3Goal ? formatValue(form.q3Goal) : "-", { bgColor: "F3E8FF" }),
         createDataCell(formatValue(form.Q3), { bold: true, bgColor: "E9D5FF" }),
-        createDataCell("-", { bgColor: "F3E8FF" }),
+        createDataCell(form.q4Goal ? formatValue(form.q4Goal) : "-", { bgColor: "F3E8FF" }),
         createDataCell(formatValue(form.Q4), { bold: true, bgColor: "E9D5FF" }),
-        createDataCell(formatValue(form.total), { bold: true, bgColor: "D1FAE5" }),
+        createDataCell(hasGoals ? formatValue(form.yearGoalTotal || 0) : formatValue(form.total), { bold: true, bgColor: "D1FAE5" }),
       ],
     });
   });

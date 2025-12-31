@@ -25,6 +25,11 @@ interface FormSubmissionData {
   Q3: number;
   Q4: number;
   total: number;
+  q1Goal?: number;
+  q2Goal?: number;
+  q3Goal?: number;
+  q4Goal?: number;
+  yearGoalTotal?: number;
 }
 
 interface HubSpotListData {
@@ -162,6 +167,7 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
           
           {formSubmissions.map((form, idx) => {
             const rowIndex = rows.length + idx;
+            const hasGoals = form.q1Goal || form.q2Goal || form.q3Goal || form.q4Goal;
             return (
               <tr 
                 key={`form-${form.formGuid}`} 
@@ -178,24 +184,48 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
                   <div className="text-xs text-muted-foreground">Form Submissions</div>
                 </td>
                 <td className="px-3 py-3 text-center font-bold">-</td>
-                <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
-                <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold" data-testid={`text-form-q1-${idx}`}>
+                <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20" data-testid={`text-form-q1-goal-${idx}`}>
+                  {form.q1Goal ? formatValue(form.q1Goal) : '-'}
+                </td>
+                <td className={cn(
+                  "px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold",
+                  form.q1Goal && form.Q1 >= form.q1Goal ? "text-green-600" : "",
+                  form.q1Goal && form.Q1 < form.q1Goal * 0.9 ? "text-red-600" : ""
+                )} data-testid={`text-form-q1-${idx}`}>
                   {formatValue(form.Q1)}
                 </td>
-                <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
-                <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold" data-testid={`text-form-q2-${idx}`}>
+                <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20" data-testid={`text-form-q2-goal-${idx}`}>
+                  {form.q2Goal ? formatValue(form.q2Goal) : '-'}
+                </td>
+                <td className={cn(
+                  "px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold",
+                  form.q2Goal && form.Q2 >= form.q2Goal ? "text-green-600" : "",
+                  form.q2Goal && form.Q2 < form.q2Goal * 0.9 ? "text-red-600" : ""
+                )} data-testid={`text-form-q2-${idx}`}>
                   {formatValue(form.Q2)}
                 </td>
-                <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
-                <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold" data-testid={`text-form-q3-${idx}`}>
+                <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20" data-testid={`text-form-q3-goal-${idx}`}>
+                  {form.q3Goal ? formatValue(form.q3Goal) : '-'}
+                </td>
+                <td className={cn(
+                  "px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold",
+                  form.q3Goal && form.Q3 >= form.q3Goal ? "text-green-600" : "",
+                  form.q3Goal && form.Q3 < form.q3Goal * 0.9 ? "text-red-600" : ""
+                )} data-testid={`text-form-q3-${idx}`}>
                   {formatValue(form.Q3)}
                 </td>
-                <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
-                <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold" data-testid={`text-form-q4-${idx}`}>
+                <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20" data-testid={`text-form-q4-goal-${idx}`}>
+                  {form.q4Goal ? formatValue(form.q4Goal) : '-'}
+                </td>
+                <td className={cn(
+                  "px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold",
+                  form.q4Goal && form.Q4 >= form.q4Goal ? "text-green-600" : "",
+                  form.q4Goal && form.Q4 < form.q4Goal * 0.9 ? "text-red-600" : ""
+                )} data-testid={`text-form-q4-${idx}`}>
                   {formatValue(form.Q4)}
                 </td>
-                <td className="px-3 py-3 text-center bg-green-100 dark:bg-green-900/30 font-semibold" data-testid={`text-form-total-${idx}`}>
-                  {formatValue(form.total)}
+                <td className="px-3 py-3 text-center bg-green-100 dark:bg-green-900/30 font-semibold" data-testid={`text-form-goal-${idx}`}>
+                  {hasGoals ? formatValue(form.yearGoalTotal || 0) : formatValue(form.total)}
                 </td>
               </tr>
             );

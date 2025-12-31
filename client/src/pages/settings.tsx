@@ -20,7 +20,11 @@ import {
   Menu,
   RefreshCw,
   Search,
-  Users
+  Users,
+  Target,
+  ChevronDown,
+  ChevronUp,
+  Save
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -52,6 +56,16 @@ interface AvailableList {
   size: number;
 }
 
+interface FormGoal {
+  id: string;
+  formId: string;
+  year: number;
+  q1Goal: number | null;
+  q2Goal: number | null;
+  q3Goal: number | null;
+  q4Goal: number | null;
+}
+
 export default function SettingsPage() {
   const { user, selectedAccount, selectedAccountName, logout } = useAuth();
   const [, setLocation] = useLocation();
@@ -72,6 +86,13 @@ export default function SettingsPage() {
   const [isLoadingAvailableLists, setIsLoadingAvailableLists] = useState(false);
   const [isAddingList, setIsAddingList] = useState(false);
   const [listSearchQuery, setListSearchQuery] = useState<string>("");
+  
+  // Form Goals state
+  const [expandedFormId, setExpandedFormId] = useState<string | null>(null);
+  const [formGoals, setFormGoals] = useState<Record<string, FormGoal[]>>({});
+  const [selectedGoalYear, setSelectedGoalYear] = useState<number>(new Date().getFullYear());
+  const [goalInputs, setGoalInputs] = useState<{ q1: string; q2: string; q3: string; q4: string }>({ q1: "", q2: "", q3: "", q4: "" });
+  const [isSavingGoal, setIsSavingGoal] = useState(false);
   
   const { toast } = useToast();
 
@@ -326,6 +347,109 @@ export default function SettingsPage() {
     }
   };
 
+  // Form Goals functions
+  const loadFormGoals = async (formId: string) => {
+    try {
+      const response = await fetch(`/api/form-goals/${formId}`);
+      if (response.ok) {
+        const goals = await response.json();
+        setFormGoals(prev => ({ ...prev, [formId]: goals }));
+        return goals;
+      }
+    } catch (error) {
+      console.error("Failed to load form goals:", error);
+    }
+    return [];
+  };
+
+  const handleToggleFormGoals = async (formId: string) => {
+    if (expandedFormId === formId) {
+      setExpandedFormId(null);
+      return;
+    }
+    
+    setExpandedFormId(formId);
+    const goals = await loadFormGoals(formId);
+    
+    // Set goal inputs based on existing goals for current year
+    const yearGoal = goals.find((g: FormGoal) => g.year === selectedGoalYear);
+    if (yearGoal) {
+      setGoalInputs({
+        q1: yearGoal.q1Goal?.toString() || "",
+        q2: yearGoal.q2Goal?.toString() || "",
+        q3: yearGoal.q3Goal?.toString() || "",
+        q4: yearGoal.q4Goal?.toString() || ""
+      });
+    } else {
+      setGoalInputs({ q1: "", q2: "", q3: "", q4: "" });
+    }
+  };
+
+  const handleYearChange = (year: number, formId: string) => {
+    setSelectedGoalYear(year);
+    const goals = formGoals[formId] || [];
+    const yearGoal = goals.find(g => g.year === year);
+    if (yearGoal) {
+      setGoalInputs({
+        q1: yearGoal.q1Goal?.toString() || "",
+        q2: yearGoal.q2Goal?.toString() || "",
+        q3: yearGoal.q3Goal?.toString() || "",
+        q4: yearGoal.q4Goal?.toString() || ""
+      });
+    } else {
+      setGoalInputs({ q1: "", q2: "", q3: "", q4: "" });
+    }
+  };
+
+  const handleSaveGoals = async (formId: string) => {
+    setIsSavingGoal(true);
+    try {
+      const response = await fetch("/api/form-goals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          formId,
+          year: selectedGoalYear,
+          q1Goal: goalInputs.q1 ? parseInt(goalInputs.q1) : 0,
+          q2Goal: goalInputs.q2 ? parseInt(goalInputs.q2) : 0,
+          q3Goal: goalInputs.q3 ? parseInt(goalInputs.q3) : 0,
+          q4Goal: goalInputs.q4 ? parseInt(goalInputs.q4) : 0
+        })
+      });
+
+      if (response.ok) {
+        const savedGoal = await response.json();
+        setFormGoals(prev => {
+          const existing = prev[formId] || [];
+          const updated = existing.filter(g => g.year !== selectedGoalYear);
+          return { ...prev, [formId]: [...updated, savedGoal] };
+        });
+        toast({
+          title: "Goals Saved",
+          description: `Goals for ${selectedGoalYear} have been saved.`
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to save goals",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save goals. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSavingGoal(false);
+    }
+  };
+
+  // Generate year options (current year and next 2 years, plus previous year)
+  const currentYear = new Date().getFullYear();
+  const yearOptions = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2];
+
   // Filter out already-added forms from the dropdown
   const unaddedForms = availableForms.filter(
     af => !savedForms.some(sf => sf.formGuid === af.id)
@@ -545,22 +669,132 @@ export default function SettingsPage() {
                         key={form.id}
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border"
+                        className="bg-muted/50 rounded-lg border overflow-hidden"
                         data-testid={`form-item-${form.id}`}
                       >
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate" data-testid={`text-form-name-${form.id}`}>{form.formName}</p>
-                          <p className="text-xs text-muted-foreground font-mono truncate">{form.formGuid}</p>
+                        <div className="flex items-center justify-between p-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate" data-testid={`text-form-name-${form.id}`}>{form.formName}</p>
+                            <p className="text-xs text-muted-foreground font-mono truncate">{form.formGuid}</p>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-muted-foreground hover:text-primary"
+                              onClick={() => handleToggleFormGoals(form.id)}
+                              data-testid={`button-goals-${form.id}`}
+                            >
+                              <Target className="w-4 h-4 mr-1" />
+                              Goals
+                              {expandedFormId === form.id ? (
+                                <ChevronUp className="w-4 h-4 ml-1" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4 ml-1" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-muted-foreground hover:text-destructive"
+                              onClick={() => handleDeleteForm(form.id, form.formName)}
+                              data-testid={`button-delete-form-${form.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-muted-foreground hover:text-destructive shrink-0"
-                          onClick={() => handleDeleteForm(form.id, form.formName)}
-                          data-testid={`button-delete-form-${form.id}`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        
+                        {expandedFormId === form.id && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="border-t bg-background/50 p-4"
+                          >
+                            <div className="space-y-4">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">Year:</span>
+                                <Select
+                                  value={selectedGoalYear.toString()}
+                                  onValueChange={(val) => handleYearChange(parseInt(val), form.id)}
+                                >
+                                  <SelectTrigger className="w-28" data-testid={`select-year-${form.id}`}>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {yearOptions.map(year => (
+                                      <SelectItem key={year} value={year.toString()}>
+                                        {year}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              
+                              <div className="grid grid-cols-4 gap-3">
+                                <div>
+                                  <label className="text-xs text-muted-foreground mb-1 block">Q1 Goal</label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    value={goalInputs.q1}
+                                    onChange={(e) => setGoalInputs(prev => ({ ...prev, q1: e.target.value }))}
+                                    placeholder="0"
+                                    data-testid={`input-q1-${form.id}`}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-xs text-muted-foreground mb-1 block">Q2 Goal</label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    value={goalInputs.q2}
+                                    onChange={(e) => setGoalInputs(prev => ({ ...prev, q2: e.target.value }))}
+                                    placeholder="0"
+                                    data-testid={`input-q2-${form.id}`}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-xs text-muted-foreground mb-1 block">Q3 Goal</label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    value={goalInputs.q3}
+                                    onChange={(e) => setGoalInputs(prev => ({ ...prev, q3: e.target.value }))}
+                                    placeholder="0"
+                                    data-testid={`input-q3-${form.id}`}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-xs text-muted-foreground mb-1 block">Q4 Goal</label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    value={goalInputs.q4}
+                                    onChange={(e) => setGoalInputs(prev => ({ ...prev, q4: e.target.value }))}
+                                    placeholder="0"
+                                    data-testid={`input-q4-${form.id}`}
+                                  />
+                                </div>
+                              </div>
+                              
+                              <Button
+                                onClick={() => handleSaveGoals(form.id)}
+                                disabled={isSavingGoal}
+                                size="sm"
+                                data-testid={`button-save-goals-${form.id}`}
+                              >
+                                {isSavingGoal ? (
+                                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                ) : (
+                                  <Save className="w-4 h-4 mr-2" />
+                                )}
+                                Save Goals
+                              </Button>
+                            </div>
+                          </motion.div>
+                        )}
                       </motion.div>
                     ))}
                   </div>
