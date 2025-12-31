@@ -202,15 +202,7 @@ export default function SettingsPage() {
     }
   };
 
-  const kpiMetrics = [
-    "Contacts",
-    "Sessions",
-    "Qualified Leads",
-    "Total Deals",
-    "Total Deal Value",
-    "Closed Won Deals",
-    "Closed Won Value"
-  ];
+  const kpiMetrics = ["Contacts", "Sessions"];
   
   const { toast } = useToast();
 
