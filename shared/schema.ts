@@ -135,3 +135,20 @@ export const insertHubspotListSchema = createInsertSchema(hubspotLists).omit({
 });
 export type InsertHubspotList = z.infer<typeof insertHubspotListSchema>;
 export type HubspotList = typeof hubspotLists.$inferSelect;
+
+// Form Goals - quarterly targets for each form per year
+export const formGoals = pgTable("form_goals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  formId: varchar("form_id").notNull().references(() => hubspotForms.id, { onDelete: "cascade" }),
+  year: integer("year").notNull(),
+  q1Goal: integer("q1_goal").default(0),
+  q2Goal: integer("q2_goal").default(0),
+  q3Goal: integer("q3_goal").default(0),
+  q4Goal: integer("q4_goal").default(0),
+});
+
+export const insertFormGoalSchema = createInsertSchema(formGoals).omit({ 
+  id: true 
+});
+export type InsertFormGoal = z.infer<typeof insertFormGoalSchema>;
+export type FormGoal = typeof formGoals.$inferSelect;

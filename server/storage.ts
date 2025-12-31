@@ -9,7 +9,8 @@ import type {
   InsertLearnedContext, LearnedContext,
   InsertReport, Report,
   InsertHubspotForm, HubspotForm,
-  InsertHubspotList, HubspotList
+  InsertHubspotList, HubspotList,
+  InsertFormGoal, FormGoal
 } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 
@@ -62,6 +63,12 @@ export interface IStorage {
   getListsByAccount(hubspotAccountId: string): Promise<HubspotList[]>;
   createList(list: InsertHubspotList): Promise<HubspotList>;
   deleteList(id: string): Promise<void>;
+  
+  // Form Goals
+  getFormGoalsByForm(formId: string): Promise<FormGoal[]>;
+  getFormGoalByFormAndYear(formId: string, year: number): Promise<FormGoal | undefined>;
+  upsertFormGoal(goal: InsertFormGoal): Promise<FormGoal>;
+  deleteFormGoalsByForm(formId: string): Promise<void>;
 }
 
 class Storage implements IStorage {
@@ -214,6 +221,47 @@ class Storage implements IStorage {
 
   async deleteList(id: string): Promise<void> {
     await db.delete(schema.hubspotLists).where(eq(schema.hubspotLists.id, id));
+  }
+
+  // Form Goals
+  async getFormGoalsByForm(formId: string): Promise<FormGoal[]> {
+    return await db.select()
+      .from(schema.formGoals)
+      .where(eq(schema.formGoals.formId, formId))
+      .orderBy(schema.formGoals.year);
+  }
+
+  async getFormGoalByFormAndYear(formId: string, year: number): Promise<FormGoal | undefined> {
+    const result = await db.select()
+      .from(schema.formGoals)
+      .where(and(
+        eq(schema.formGoals.formId, formId),
+        eq(schema.formGoals.year, year)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async upsertFormGoal(goal: InsertFormGoal): Promise<FormGoal> {
+    const existing = await this.getFormGoalByFormAndYear(goal.formId, goal.year);
+    if (existing) {
+      const result = await db.update(schema.formGoals)
+        .set({
+          q1Goal: goal.q1Goal,
+          q2Goal: goal.q2Goal,
+          q3Goal: goal.q3Goal,
+          q4Goal: goal.q4Goal,
+        })
+        .where(eq(schema.formGoals.id, existing.id))
+        .returning();
+      return result[0];
+    }
+    const result = await db.insert(schema.formGoals).values(goal).returning();
+    return result[0];
+  }
+
+  async deleteFormGoalsByForm(formId: string): Promise<void> {
+    await db.delete(schema.formGoals).where(eq(schema.formGoals.formId, formId));
   }
 }
 

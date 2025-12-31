@@ -390,6 +390,59 @@ export async function registerRoutes(
   });
 
   // ==========================================
+  // Form Goals
+  // ==========================================
+
+  // Get goals for a specific form
+  app.get("/api/form-goals/:formId", async (req, res) => {
+    try {
+      const { formId } = req.params;
+      const goals = await storage.getFormGoalsByForm(formId);
+      res.json(goals);
+    } catch (error) {
+      console.error("Error fetching form goals:", error);
+      res.status(500).json({ error: "Failed to fetch form goals" });
+    }
+  });
+
+  // Get goal for a specific form and year
+  app.get("/api/form-goals/:formId/:year", async (req, res) => {
+    try {
+      const { formId, year } = req.params;
+      const goal = await storage.getFormGoalByFormAndYear(formId, parseInt(year));
+      res.json(goal || null);
+    } catch (error) {
+      console.error("Error fetching form goal:", error);
+      res.status(500).json({ error: "Failed to fetch form goal" });
+    }
+  });
+
+  // Create or update form goals
+  const formGoalSchema = z.object({
+    formId: z.string().min(1, "Form ID is required"),
+    year: z.number().int().min(2020).max(2100),
+    q1Goal: z.number().int().min(0).optional().default(0),
+    q2Goal: z.number().int().min(0).optional().default(0),
+    q3Goal: z.number().int().min(0).optional().default(0),
+    q4Goal: z.number().int().min(0).optional().default(0),
+  });
+
+  app.post("/api/form-goals", async (req, res) => {
+    try {
+      const parseResult = formGoalSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: parseResult.error.errors[0]?.message || "Invalid request" });
+      }
+
+      const goal = await storage.upsertFormGoal(parseResult.data);
+      res.json(goal);
+    } catch (error) {
+      console.error("Error saving form goal:", error);
+      res.status(500).json({ error: "Failed to save form goal" });
+    }
+  });
+
+  // ==========================================
   // Conversations
   // ==========================================
 
