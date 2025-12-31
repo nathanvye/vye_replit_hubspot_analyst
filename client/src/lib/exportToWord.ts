@@ -41,6 +41,12 @@ interface FormSubmissionData {
   total: number;
 }
 
+interface HubSpotListData {
+  listId: string;
+  listName: string;
+  memberCount: number;
+}
+
 interface ReportData {
   title: string;
   subtitle: string;
@@ -49,6 +55,7 @@ interface ReportData {
     rows: KPIRow[];
   };
   formSubmissions?: FormSubmissionData[];
+  hubspotLists?: HubSpotListData[];
   dealsByStage?: { stage: string; count: number; value: number }[];
   dealsByOwner?: { owner: string; count: number; value: number }[];
   revenueInsights?: string[];
@@ -149,7 +156,7 @@ const createDataCell = (
   });
 };
 
-const createKPITable = (rows: KPIRow[], year: number, formSubmissions: FormSubmissionData[] = []): Table => {
+const createKPITable = (rows: KPIRow[], year: number, formSubmissions: FormSubmissionData[] = [], hubspotLists: HubSpotListData[] = []): Table => {
   const headerRow = new TableRow({
     children: [
       createHeaderCell(""),
@@ -271,8 +278,52 @@ const createKPITable = (rows: KPIRow[], year: number, formSubmissions: FormSubmi
     });
   });
 
+  const listRows = hubspotLists.map((list, idx) => {
+    const rowIndex = rows.length + formSubmissions.length + idx;
+    const bgColor = rowIndex % 2 === 0 ? "FFFFFF" : "F5F5F5";
+    
+    return new TableRow({
+      children: [
+        new TableCell({
+          children: [
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: list.listName,
+                  bold: true,
+                  color: PURPLE_COLOR,
+                  size: 18,
+                }),
+              ],
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "List Members",
+                  size: 16,
+                  color: "666666",
+                }),
+              ],
+            }),
+          ],
+          shading: { type: ShadingType.SOLID, color: bgColor },
+        }),
+        createDataCell("-", { bold: true, bgColor }),
+        createDataCell("-", { bgColor: "F3E8FF" }),
+        createDataCell("-", { bgColor: "E9D5FF" }),
+        createDataCell("-", { bgColor: "F3E8FF" }),
+        createDataCell("-", { bgColor: "E9D5FF" }),
+        createDataCell("-", { bgColor: "F3E8FF" }),
+        createDataCell("-", { bgColor: "E9D5FF" }),
+        createDataCell("-", { bgColor: "F3E8FF" }),
+        createDataCell("-", { bgColor: "E9D5FF" }),
+        createDataCell(formatValue(list.memberCount), { bold: true, bgColor: "D1FAE5" }),
+      ],
+    });
+  });
+
   return new Table({
-    rows: [headerRow, ...dataRows, ...formRows],
+    rows: [headerRow, ...dataRows, ...formRows, ...listRows],
     width: {
       size: 100,
       type: WidthType.PERCENTAGE,
@@ -495,7 +546,8 @@ export async function exportReportToWord(report: ReportData): Promise<void> {
       createKPITable(
         report.kpiTable.rows,
         report.kpiTable.year,
-        report.formSubmissions || []
+        report.formSubmissions || [],
+        report.hubspotLists || []
       )
     );
   } else if (report.verifiedData) {

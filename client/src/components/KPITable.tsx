@@ -27,13 +27,20 @@ interface FormSubmissionData {
   total: number;
 }
 
+interface HubSpotListData {
+  listId: string;
+  listName: string;
+  memberCount: number;
+}
+
 interface KPITableProps {
   rows: KPIRow[];
   year?: number;
   formSubmissions?: FormSubmissionData[];
+  hubspotLists?: HubSpotListData[];
 }
 
-export function KPITable({ rows, year = 2025, formSubmissions = [] }: KPITableProps) {
+export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists = [] }: KPITableProps) {
   const formatValue = (value: number | string | null) => {
     if (value === null || value === undefined || value === '') return '-';
     if (typeof value === 'number') {
@@ -59,7 +66,7 @@ export function KPITable({ rows, year = 2025, formSubmissions = [] }: KPITablePr
     return '';
   };
 
-  const totalRows = rows.length + formSubmissions.length;
+  const totalRows = rows.length + formSubmissions.length + hubspotLists.length;
 
   return (
     <div className="overflow-x-auto rounded-lg border border-border shadow-sm">
@@ -189,6 +196,39 @@ export function KPITable({ rows, year = 2025, formSubmissions = [] }: KPITablePr
                 </td>
                 <td className="px-3 py-3 text-center bg-green-100 dark:bg-green-900/30 font-semibold" data-testid={`text-form-total-${idx}`}>
                   {formatValue(form.total)}
+                </td>
+              </tr>
+            );
+          })}
+          
+          {hubspotLists.map((list, idx) => {
+            const rowIndex = rows.length + formSubmissions.length + idx;
+            return (
+              <tr 
+                key={`list-${list.listId}`} 
+                className={cn(
+                  "border-t border-border",
+                  rowIndex % 2 === 0 ? "bg-white dark:bg-slate-900" : "bg-gray-50 dark:bg-slate-800"
+                )}
+                data-testid={`row-hubspot-list-${idx}`}
+              >
+                <td className="px-3 py-3 text-left">
+                  <div className="text-[#5C3D5E] font-semibold" data-testid={`text-list-name-${idx}`}>
+                    {list.listName}
+                  </div>
+                  <div className="text-xs text-muted-foreground">List Members</div>
+                </td>
+                <td className="px-3 py-3 text-center font-bold">-</td>
+                <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+                <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30">-</td>
+                <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+                <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30">-</td>
+                <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+                <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30">-</td>
+                <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+                <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30">-</td>
+                <td className="px-3 py-3 text-center bg-green-100 dark:bg-green-900/30 font-semibold" data-testid={`text-list-count-${idx}`}>
+                  {formatValue(list.memberCount)}
                 </td>
               </tr>
             );

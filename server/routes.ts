@@ -556,10 +556,41 @@ export async function registerRoutes(
         });
       }
       
+      // Fetch saved lists with their member counts
+      const savedLists = await storage.getListsByAccount(hubspotAccountId);
+      const listsData: Array<{
+        listId: string;
+        listName: string;
+        memberCount: number;
+      }> = [];
+      
+      for (const list of savedLists) {
+        // Fetch fresh member count from HubSpot
+        const listDetails = await getListById(apiKey, list.listId);
+        
+        // Use type guard to check for successful response
+        if ('name' in listDetails && 'size' in listDetails) {
+          listsData.push({
+            listId: list.listId,
+            listName: listDetails.name || list.listName,
+            memberCount: typeof listDetails.size === 'number' ? listDetails.size : 0
+          });
+        } else {
+          // Error response - use stored data with 0 count
+          console.warn(`Failed to fetch list details for ${list.listId}:`, listDetails.error);
+          listsData.push({
+            listId: list.listId,
+            listName: list.listName,
+            memberCount: 0
+          });
+        }
+      }
+      
       const reportData = await generateReport(hubspotData, learnedContext);
       
-      // Add form submissions to report data
+      // Add form submissions and lists to report data
       (reportData as any).formSubmissions = formSubmissionsData;
+      (reportData as any).hubspotLists = listsData;
 
       const report = await storage.createReport({
         conversationId: conversationId || null,

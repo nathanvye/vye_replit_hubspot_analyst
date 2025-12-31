@@ -39,6 +39,12 @@ interface FormSubmissionData {
   total: number;
 }
 
+interface HubSpotListData {
+  listId: string;
+  listName: string;
+  memberCount: number;
+}
+
 interface ReportData {
   title: string;
   subtitle: string;
@@ -47,6 +53,7 @@ interface ReportData {
     rows: KPIRow[];
   };
   formSubmissions?: FormSubmissionData[];
+  hubspotLists?: HubSpotListData[];
   dealsByStage?: StageData[];
   dealsByOwner?: { owner: string; count: number; value: number }[];
   revenueInsights?: string[];
@@ -250,6 +257,7 @@ export function ReportView() {
             rows={report.kpiTable.rows} 
             year={report.kpiTable.year}
             formSubmissions={report.formSubmissions}
+            hubspotLists={report.hubspotLists}
           />
         ) : verified && (
           <Card className="overflow-hidden border-border/60 shadow-sm">

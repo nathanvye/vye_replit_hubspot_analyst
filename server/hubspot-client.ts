@@ -364,11 +364,27 @@ export async function getAllLists(
       const results = response?.lists || [];
       console.log(`Found ${results.length} lists in this page (offset: ${offset})`);
 
+      // Log first list structure to debug
+      if (offset === 0 && results.length > 0) {
+        console.log("Sample list structure:", JSON.stringify(results[0], null, 2));
+      }
+      
       for (const list of results) {
+        // Try multiple possible locations for the size/member count
+        // HubSpot v3 Lists API typically returns size in metaData.size
+        let rawSize = list.metaData?.size 
+          ?? list.additionalProperties?.hs_list_size 
+          ?? list.size 
+          ?? 0;
+        
+        // Ensure we have a valid number
+        const size = typeof rawSize === 'number' ? rawSize : parseInt(String(rawSize), 10);
+        const validSize = isNaN(size) ? 0 : size;
+        
         lists.push({
           listId: list.listId?.toString() || "",
           name: list.name || "Unnamed List",
-          size: list.size || 0,
+          size: validSize,
         });
       }
 
@@ -402,7 +418,7 @@ export async function getListById(
   apiKey: string,
   listId: string,
 ): Promise<
-  { listId: string; name: string; size: number; error?: string } | { error: string }
+  { listId: string; name: string; size: number } | { error: string }
 > {
   const client = createHubSpotClient(apiKey);
 
@@ -413,11 +429,27 @@ export async function getListById(
     });
 
     const response = await httpResponse.json();
+    
+    console.log("List by ID response:", JSON.stringify(response, null, 2));
+    
+    // Get size from metaData.size (HubSpot v3 Lists API standard location)
+    let rawSize = response.metaData?.size 
+      ?? response.additionalProperties?.hs_list_size 
+      ?? response.size 
+      ?? 0;
+    
+    // Ensure we have a valid number
+    const size = typeof rawSize === 'number' ? rawSize : parseInt(String(rawSize), 10);
+    const validSize = isNaN(size) ? 0 : size;
+    
+    if (validSize === 0 && rawSize !== 0) {
+      console.warn(`List ${listId} has non-numeric size value:`, rawSize);
+    }
 
     return {
       listId: response.listId?.toString() || listId,
       name: response.name || "Unknown List",
-      size: response.size || 0,
+      size: validSize,
     };
   } catch (error: any) {
     const status = error.code || error.response?.status || error.statusCode;
