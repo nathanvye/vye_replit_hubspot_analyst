@@ -136,14 +136,19 @@ export function ReportView() {
 
   const enrichedKpiRows = (report?.kpiTable?.rows || [])
     .map(row => {
-    const goals = kpiGoals?.find(g => g.metric === row.metric && g.year === (report?.kpiTable?.year || currentYear));
+    // Find goal for this specific metric and year
+    const goals = kpiGoals?.find(g => 
+      g.metric.toLowerCase() === row.metric.toLowerCase() && 
+      g.year === (report?.kpiTable?.year || currentYear)
+    );
+    
     if (goals) {
       return {
         ...row,
-        q1Goal: goals.q1Goal,
-        q2Goal: goals.q2Goal,
-        q3Goal: goals.q3Goal,
-        q4Goal: goals.q4Goal,
+        q1Goal: goals.q1Goal || 0,
+        q2Goal: goals.q2Goal || 0,
+        q3Goal: goals.q3Goal || 0,
+        q4Goal: goals.q4Goal || 0,
       };
     }
     return row;
