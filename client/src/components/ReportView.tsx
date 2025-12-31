@@ -137,8 +137,10 @@ export function ReportView() {
   const enrichedKpiRows = (report?.kpiTable?.rows || [])
     .map(row => {
     // Find goal for this specific metric and year
+    // Handle "New Contacts" vs "Contacts" naming discrepancy
+    const metricName = row.metric === "New Contacts" ? "Contacts" : row.metric;
     const goals = kpiGoals?.find(g => 
-      g.metric.toLowerCase() === row.metric.toLowerCase() && 
+      g.metric.toLowerCase() === metricName.toLowerCase() && 
       g.year === (report?.kpiTable?.year || currentYear)
     );
     

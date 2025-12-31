@@ -83,11 +83,6 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
         <thead>
           <tr className="bg-[#5C3D5E] text-white">
             <th className="px-3 py-3 text-left font-semibold min-w-[140px]"></th>
-            <th className="px-3 py-3 text-center font-semibold min-w-[90px]">
-              <div className="text-xs">{year - 1}</div>
-              <div>Year-End</div>
-              <div>Projections</div>
-            </th>
             <th className="px-3 py-3 text-center font-semibold bg-[#4A3049] min-w-[70px]">Q1</th>
             <th className="px-3 py-3 text-center font-semibold bg-[#8B7089] min-w-[80px]">Q1 Actuals</th>
             <th className="px-3 py-3 text-center font-semibold bg-[#4A3049] min-w-[70px]">Q2</th>
@@ -134,7 +129,6 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
                   </div>
                 )}
               </td>
-              <td className="px-3 py-3 text-center font-bold">{formatValue(row.yearEndProjection)}</td>
               <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">
                 {row.q1Goal ? formatValue(row.q1Goal) : formatValue(row.q1.projection)}
               </td>
@@ -197,7 +191,6 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
                   </div>
                   <div className="text-xs text-muted-foreground">Form Submissions</div>
                 </td>
-                <td className="px-3 py-3 text-center font-bold">-</td>
                 <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20" data-testid={`text-form-q1-goal-${idx}`}>
                   {form.q1Goal ? formatValue(form.q1Goal) : '-'}
                 </td>
@@ -262,7 +255,6 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
                   </div>
                   <div className="text-xs text-muted-foreground">List Members</div>
                 </td>
-                <td className="px-3 py-3 text-center font-bold">-</td>
                 <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
                 <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30">-</td>
                 <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
