@@ -135,7 +135,6 @@ export function ReportView() {
   });
 
   const enrichedKpiRows = (report?.kpiTable?.rows || [])
-    .filter(row => row.metric === "Contacts" || row.metric === "Sessions")
     .map(row => {
     const goals = kpiGoals?.find(g => g.metric === row.metric && g.year === (report?.kpiTable?.year || currentYear));
     if (goals) {
