@@ -11,7 +11,8 @@ import type {
   InsertHubspotForm, HubspotForm,
   InsertHubspotList, HubspotList,
   InsertFormGoal, FormGoal,
-  InsertKpiGoal, KpiGoal
+  InsertKpiGoal, KpiGoal,
+  InsertGoogleAnalyticsConfig, GoogleAnalyticsConfig
 } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 
@@ -75,6 +76,10 @@ export interface IStorage {
   getKpiGoalsByAccount(hubspotAccountId: string): Promise<KpiGoal[]>;
   getKpiGoalByAccountMetricAndYear(hubspotAccountId: string, metric: string, year: number): Promise<KpiGoal | undefined>;
   upsertKpiGoal(goal: InsertKpiGoal): Promise<KpiGoal>;
+
+  // Google Analytics Config
+  getGoogleAnalyticsConfig(hubspotAccountId: string): Promise<GoogleAnalyticsConfig | undefined>;
+  upsertGoogleAnalyticsConfig(config: InsertGoogleAnalyticsConfig): Promise<GoogleAnalyticsConfig>;
 }
 
 class Storage implements IStorage {
@@ -305,6 +310,28 @@ class Storage implements IStorage {
       return result[0];
     }
     const result = await db.insert(schema.kpiGoals).values(goal).returning();
+    return result[0];
+  }
+
+  // Google Analytics Config
+  async getGoogleAnalyticsConfig(hubspotAccountId: string): Promise<GoogleAnalyticsConfig | undefined> {
+    const result = await db.select()
+      .from(schema.googleAnalyticsConfig)
+      .where(eq(schema.googleAnalyticsConfig.hubspotAccountId, hubspotAccountId))
+      .limit(1);
+    return result[0];
+  }
+
+  async upsertGoogleAnalyticsConfig(config: InsertGoogleAnalyticsConfig): Promise<GoogleAnalyticsConfig> {
+    const existing = await this.getGoogleAnalyticsConfig(config.hubspotAccountId);
+    if (existing) {
+      const result = await db.update(schema.googleAnalyticsConfig)
+        .set({ propertyId: config.propertyId })
+        .where(eq(schema.googleAnalyticsConfig.id, existing.id))
+        .returning();
+      return result[0];
+    }
+    const result = await db.insert(schema.googleAnalyticsConfig).values(config).returning();
     return result[0];
   }
 }

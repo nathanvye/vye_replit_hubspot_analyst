@@ -17,6 +17,7 @@ import {
 } from "./hubspot-client";
 import { analyzeWithAI, generateReport, extractLearning } from "./ai-service";
 import { encrypt, decrypt } from "./encryption";
+import { getPageViewsQuarterly, getChannelGroupBreakdown, isGoogleAnalyticsConfigured } from "./google-analytics-client";
 import { z } from "zod";
 
 // Helper to get API key for a HubSpot account
@@ -484,6 +485,89 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error saving KPI goal:", error);
       res.status(500).json({ error: "Failed to save KPI goal" });
+    }
+  });
+
+  // ==========================================
+  // Google Analytics
+  // ==========================================
+
+  // Check if GA service account is configured at the server level
+  app.get("/api/google-analytics/status", (req, res) => {
+    res.json({ 
+      configured: isGoogleAnalyticsConfigured(),
+      message: isGoogleAnalyticsConfigured() 
+        ? "Google Analytics service account is configured" 
+        : "Google Analytics service account not configured. Set GOOGLE_SERVICE_ACCOUNT_KEY environment variable."
+    });
+  });
+
+  // Get GA config for an account
+  app.get("/api/google-analytics/config/:accountId", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const config = await storage.getGoogleAnalyticsConfig(accountId);
+      res.json(config || null);
+    } catch (error) {
+      console.error("Error fetching GA config:", error);
+      res.status(500).json({ error: "Failed to fetch Google Analytics config" });
+    }
+  });
+
+  // Save GA config
+  const gaConfigSchema = z.object({
+    hubspotAccountId: z.string().min(1, "Account ID is required"),
+    propertyId: z.string().min(1, "Property ID is required"),
+  });
+
+  app.post("/api/google-analytics/config", async (req, res) => {
+    try {
+      const parseResult = gaConfigSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: parseResult.error.errors[0]?.message || "Invalid request" });
+      }
+
+      const config = await storage.upsertGoogleAnalyticsConfig(parseResult.data);
+      res.json(config);
+    } catch (error) {
+      console.error("Error saving GA config:", error);
+      res.status(500).json({ error: "Failed to save Google Analytics config" });
+    }
+  });
+
+  // Get GA page views (quarterly)
+  app.get("/api/google-analytics/pageviews/:accountId/:year", async (req, res) => {
+    try {
+      const { accountId, year } = req.params;
+      
+      const config = await storage.getGoogleAnalyticsConfig(accountId);
+      if (!config) {
+        return res.json({ Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0, configured: false });
+      }
+
+      const pageViews = await getPageViewsQuarterly(config.propertyId, parseInt(year));
+      res.json({ ...pageViews, configured: true });
+    } catch (error) {
+      console.error("Error fetching page views:", error);
+      res.status(500).json({ error: "Failed to fetch page views" });
+    }
+  });
+
+  // Get GA channel breakdown
+  app.get("/api/google-analytics/channels/:accountId/:year", async (req, res) => {
+    try {
+      const { accountId, year } = req.params;
+      
+      const config = await storage.getGoogleAnalyticsConfig(accountId);
+      if (!config) {
+        return res.json({ channels: [], configured: false });
+      }
+
+      const channels = await getChannelGroupBreakdown(config.propertyId, parseInt(year));
+      res.json({ channels, configured: true });
+    } catch (error) {
+      console.error("Error fetching channel breakdown:", error);
+      res.status(500).json({ error: "Failed to fetch channel breakdown" });
     }
   });
 

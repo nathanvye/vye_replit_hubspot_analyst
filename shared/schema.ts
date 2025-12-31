@@ -153,6 +153,21 @@ export const insertFormGoalSchema = createInsertSchema(formGoals).omit({
 export type InsertFormGoal = z.infer<typeof insertFormGoalSchema>;
 export type FormGoal = typeof formGoals.$inferSelect;
 
+// Google Analytics configuration per HubSpot account
+export const googleAnalyticsConfig = pgTable("google_analytics_config", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  hubspotAccountId: varchar("hubspot_account_id").notNull().references(() => hubspotAccounts.id, { onDelete: "cascade" }),
+  propertyId: text("property_id").notNull(), // GA4 Property ID (e.g., "123456789")
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertGoogleAnalyticsConfigSchema = createInsertSchema(googleAnalyticsConfig).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type InsertGoogleAnalyticsConfig = z.infer<typeof insertGoogleAnalyticsConfigSchema>;
+export type GoogleAnalyticsConfig = typeof googleAnalyticsConfig.$inferSelect;
+
 // KPI Goals - quarterly targets for overall metrics per year
 export const kpiGoals = pgTable("kpi_goals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

@@ -100,6 +100,12 @@ export default function SettingsPage() {
   const [kpiGoals, setKpiGoals] = useState<Record<string, any>>({});
   const [isSavingKpiGoal, setIsSavingKpiGoal] = useState(false);
 
+  // Google Analytics config state
+  const [gaPropertyId, setGaPropertyId] = useState<string>("");
+  const [isSavingGaConfig, setIsSavingGaConfig] = useState(false);
+  const [gaConfigured, setGaConfigured] = useState(false);
+  const [gaServerConfigured, setGaServerConfigured] = useState<boolean | null>(null);
+
   useEffect(() => {
     if (!user || !selectedAccount) {
       setLocation("/");
@@ -110,7 +116,69 @@ export default function SettingsPage() {
     loadLists();
     loadAvailableLists();
     loadKpiGoals();
+    loadGaConfig();
   }, [user, selectedAccount, setLocation]);
+
+  const loadGaConfig = async () => {
+    if (!selectedAccount) return;
+    try {
+      // Check server-level GA configuration
+      const statusResponse = await fetch("/api/google-analytics/status");
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json();
+        setGaServerConfigured(statusData.configured);
+      }
+
+      // Check account-level GA configuration
+      const response = await fetch(`/api/google-analytics/config/${selectedAccount}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.propertyId) {
+          setGaPropertyId(data.propertyId);
+          setGaConfigured(true);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load GA config:", error);
+    }
+  };
+
+  const handleSaveGaConfig = async () => {
+    if (!selectedAccount || !gaPropertyId.trim()) return;
+    setIsSavingGaConfig(true);
+    try {
+      const response = await fetch("/api/google-analytics/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hubspotAccountId: selectedAccount,
+          propertyId: gaPropertyId.trim()
+        })
+      });
+
+      if (response.ok) {
+        setGaConfigured(true);
+        toast({
+          title: "Saved",
+          description: "Google Analytics configuration saved successfully."
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to save GA configuration",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save GA configuration. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSavingGaConfig(false);
+    }
+  };
 
   const loadKpiGoals = async () => {
     if (!selectedAccount) return;
@@ -202,7 +270,7 @@ export default function SettingsPage() {
     }
   };
 
-  const kpiMetrics = ["Contacts", "Sessions"];
+  const kpiMetrics = ["Contacts", "Page Views"];
   
   const { toast } = useToast();
 
@@ -831,6 +899,73 @@ export default function SettingsPage() {
                       </div>
                     );
                   })}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">Google Analytics</CardTitle>
+                    <CardDescription>
+                      Connect Google Analytics to track page views and traffic sources.
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {gaServerConfigured === false && (
+                      <div className="flex items-center gap-2 text-xs text-amber-600">
+                        <span className="w-2 h-2 rounded-full bg-amber-500" />
+                        Setup Required
+                      </div>
+                    )}
+                    {gaServerConfigured && gaConfigured && (
+                      <div className="flex items-center gap-2 text-xs text-green-600">
+                        <span className="w-2 h-2 rounded-full bg-green-500" />
+                        Connected
+                      </div>
+                    )}
+                    {gaServerConfigured && !gaConfigured && (
+                      <div className="flex items-center gap-2 text-xs text-blue-600">
+                        <span className="w-2 h-2 rounded-full bg-blue-500" />
+                        Ready to Configure
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {gaServerConfigured === false && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                    <p className="font-medium mb-2">Service Account Required</p>
+                    <p className="text-xs">
+                      To enable Google Analytics integration, a service account key needs to be configured. Contact your administrator to set up the GOOGLE_SERVICE_ACCOUNT_KEY.
+                    </p>
+                  </div>
+                )}
+                
+                <div className="space-y-2">
+                  <Label htmlFor="ga-property-id">GA4 Property ID</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="ga-property-id"
+                      placeholder="e.g., 123456789"
+                      value={gaPropertyId}
+                      onChange={(e) => setGaPropertyId(e.target.value)}
+                      disabled={gaServerConfigured === false}
+                      data-testid="input-ga-property-id"
+                    />
+                    <Button 
+                      onClick={handleSaveGaConfig}
+                      disabled={isSavingGaConfig || !gaPropertyId.trim() || gaServerConfigured === false}
+                      data-testid="button-save-ga-config"
+                    >
+                      {isSavingGaConfig ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Find your Property ID in Google Analytics: Admin → Property Settings → Property ID
+                  </p>
                 </div>
               </CardContent>
             </Card>

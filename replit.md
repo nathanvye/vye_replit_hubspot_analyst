@@ -69,6 +69,7 @@ Preferred communication style: Simple, everyday language.
 ### Third-Party Services
 - **HubSpot API**: CRM data access via `@hubspot/api-client` - requires Private App access tokens
 - **OpenAI API**: AI analysis and natural language processing
+- **Google Analytics Data API**: Page view and traffic channel tracking (optional)
 
 ### Database
 - **PostgreSQL**: Required, connection via `DATABASE_URL` environment variable
@@ -81,6 +82,31 @@ Preferred communication style: Simple, everyday language.
 - `GOOGLE_CLIENT_ID` - Google OAuth 2.0 Client ID
 - `GOOGLE_CLIENT_SECRET` - Google OAuth 2.0 Client Secret
 - `ENCRYPTION_KEY` - Used for encrypting stored HubSpot API keys (falls back to SESSION_SECRET)
+- `GOOGLE_SERVICE_ACCOUNT_KEY` - (Optional) JSON service account key for Google Analytics Data API
+
+### Google Analytics Integration (Optional)
+
+To enable Google Analytics page view and traffic channel tracking:
+
+1. **Create a Service Account** in Google Cloud Console:
+   - Go to APIs & Services → Credentials → Create Credentials → Service Account
+   - Enable the "Google Analytics Data API" in APIs & Services → Library
+   
+2. **Grant Access in Google Analytics**:
+   - In GA4: Admin → Property → Property Access Management
+   - Add the service account email (from step 1) with "Viewer" role
+   
+3. **Configure the Environment Variable**:
+   - Copy the service account JSON key
+   - Set `GOOGLE_SERVICE_ACCOUNT_KEY` to the full JSON content (escaped as needed)
+   
+4. **Configure Property ID** in Settings:
+   - Find your GA4 Property ID: Admin → Property Settings → Property ID (numeric ID like `123456789`)
+   - Enter it in Settings → Google Analytics
+
+The integration provides:
+- Quarterly page view counts
+- Traffic channel group breakdown (with pie chart visualization)
 
 ### HubSpot Private App Required Scopes
 For full functionality, ensure your HubSpot Private App has these scopes enabled:
