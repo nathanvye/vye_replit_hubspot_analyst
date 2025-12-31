@@ -100,9 +100,7 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
           </tr>
         </thead>
         <tbody>
-          {(rows || [])
-            .filter((row) => row.metric === "Contacts" || row.metric === "Sessions")
-            .map((row, idx) => (
+          {rows.map((row, idx) => (
             <tr 
               key={idx} 
               className={cn(
