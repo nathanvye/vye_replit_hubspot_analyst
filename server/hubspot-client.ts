@@ -432,6 +432,9 @@ export async function getListById(
     
     console.log("List by ID response:", JSON.stringify(response, null, 2));
     
+    // In HubSpot v3, the name is top-level. ID is listId.
+    const name = response.name || response.label || "Unknown List";
+    
     // Get size from metaData.size (HubSpot v3 Lists API standard location)
     let rawSize = response.metaData?.size 
       ?? response.additionalProperties?.hs_list_size 
@@ -448,7 +451,7 @@ export async function getListById(
 
     return {
       listId: response.listId?.toString() || listId,
-      name: response.name || "Unknown List",
+      name,
       size: validSize,
     };
   } catch (error: any) {
