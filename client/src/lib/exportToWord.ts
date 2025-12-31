@@ -272,13 +272,29 @@ const createKPITable = (rows: KPIRow[], year: number, formSubmissions: FormSubmi
         }),
         createDataCell("-", { bold: true, bgColor }),
         createDataCell(form.q1Goal ? formatValue(form.q1Goal) : "-", { bgColor: "F3E8FF" }),
-        createDataCell(formatValue(form.Q1), { bold: true, bgColor: "E9D5FF" }),
+        createDataCell(formatValue(form.Q1), { 
+          bold: true, 
+          bgColor: "E9D5FF",
+          color: form.q1Goal ? (form.Q1 > form.q1Goal ? "16A34A" : form.Q1 < form.q1Goal ? "991B1B" : "000000") : "000000"
+        }),
         createDataCell(form.q2Goal ? formatValue(form.q2Goal) : "-", { bgColor: "F3E8FF" }),
-        createDataCell(formatValue(form.Q2), { bold: true, bgColor: "E9D5FF" }),
+        createDataCell(formatValue(form.Q2), { 
+          bold: true, 
+          bgColor: "E9D5FF",
+          color: form.q2Goal ? (form.Q2 > form.q2Goal ? "16A34A" : form.Q2 < form.q2Goal ? "991B1B" : "000000") : "000000"
+        }),
         createDataCell(form.q3Goal ? formatValue(form.q3Goal) : "-", { bgColor: "F3E8FF" }),
-        createDataCell(formatValue(form.Q3), { bold: true, bgColor: "E9D5FF" }),
+        createDataCell(formatValue(form.Q3), { 
+          bold: true, 
+          bgColor: "E9D5FF",
+          color: form.q3Goal ? (form.Q3 > form.q3Goal ? "16A34A" : form.Q3 < form.q3Goal ? "991B1B" : "000000") : "000000"
+        }),
         createDataCell(form.q4Goal ? formatValue(form.q4Goal) : "-", { bgColor: "F3E8FF" }),
-        createDataCell(formatValue(form.Q4), { bold: true, bgColor: "E9D5FF" }),
+        createDataCell(formatValue(form.Q4), { 
+          bold: true, 
+          bgColor: "E9D5FF",
+          color: form.q4Goal ? (form.Q4 > form.q4Goal ? "16A34A" : form.Q4 < form.q4Goal ? "991B1B" : "000000") : "000000"
+        }),
         createDataCell(hasGoals ? formatValue(form.yearGoalTotal || 0) : formatValue(form.total), { bold: true, bgColor: "D1FAE5" }),
       ],
     });

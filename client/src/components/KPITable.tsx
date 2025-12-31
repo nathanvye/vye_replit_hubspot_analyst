@@ -189,8 +189,8 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
                 </td>
                 <td className={cn(
                   "px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold",
-                  form.q1Goal && form.Q1 >= form.q1Goal ? "text-green-600" : "",
-                  form.q1Goal && form.Q1 < form.q1Goal * 0.9 ? "text-red-600" : ""
+                  form.q1Goal && form.Q1 > form.q1Goal ? "text-green-600" : "",
+                  form.q1Goal && form.Q1 < form.q1Goal ? "text-red-600" : ""
                 )} data-testid={`text-form-q1-${idx}`}>
                   {formatValue(form.Q1)}
                 </td>
@@ -199,8 +199,8 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
                 </td>
                 <td className={cn(
                   "px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold",
-                  form.q2Goal && form.Q2 >= form.q2Goal ? "text-green-600" : "",
-                  form.q2Goal && form.Q2 < form.q2Goal * 0.9 ? "text-red-600" : ""
+                  form.q2Goal && form.Q2 > form.q2Goal ? "text-green-600" : "",
+                  form.q2Goal && form.Q2 < form.q2Goal ? "text-red-600" : ""
                 )} data-testid={`text-form-q2-${idx}`}>
                   {formatValue(form.Q2)}
                 </td>
@@ -209,8 +209,8 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
                 </td>
                 <td className={cn(
                   "px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold",
-                  form.q3Goal && form.Q3 >= form.q3Goal ? "text-green-600" : "",
-                  form.q3Goal && form.Q3 < form.q3Goal * 0.9 ? "text-red-600" : ""
+                  form.q3Goal && form.Q3 > form.q3Goal ? "text-green-600" : "",
+                  form.q3Goal && form.Q3 < form.q3Goal ? "text-red-600" : ""
                 )} data-testid={`text-form-q3-${idx}`}>
                   {formatValue(form.Q3)}
                 </td>
@@ -219,8 +219,8 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
                 </td>
                 <td className={cn(
                   "px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold",
-                  form.q4Goal && form.Q4 >= form.q4Goal ? "text-green-600" : "",
-                  form.q4Goal && form.Q4 < form.q4Goal * 0.9 ? "text-red-600" : ""
+                  form.q4Goal && form.Q4 > form.q4Goal ? "text-green-600" : "",
+                  form.q4Goal && form.Q4 < form.q4Goal ? "text-red-600" : ""
                 )} data-testid={`text-form-q4-${idx}`}>
                   {formatValue(form.Q4)}
                 </td>
