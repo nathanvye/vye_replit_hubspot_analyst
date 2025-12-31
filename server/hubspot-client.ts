@@ -432,13 +432,14 @@ export async function getListById(
     
     console.log("List by ID response:", JSON.stringify(response, null, 2));
     
-    // In HubSpot v3, the name is top-level. ID is listId.
-    const name = response.name || response.label || "Unknown List";
+    // In HubSpot v3, the list details are often wrapped in a 'list' property
+    const listData = response.list || response;
+    const name = listData.name || listData.label || "Unknown List";
     
     // Get size from metaData.size (HubSpot v3 Lists API standard location)
-    let rawSize = response.metaData?.size 
-      ?? response.additionalProperties?.hs_list_size 
-      ?? response.size 
+    let rawSize = listData.metaData?.size 
+      ?? listData.additionalProperties?.hs_list_size 
+      ?? listData.size 
       ?? 0;
     
     // Ensure we have a valid number
@@ -450,7 +451,7 @@ export async function getListById(
     }
 
     return {
-      listId: response.listId?.toString() || listId,
+      listId: listData.listId?.toString() || listId,
       name,
       size: validSize,
     };

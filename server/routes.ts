@@ -355,15 +355,19 @@ export async function registerRoutes(
 
       // Look up list name from HubSpot
       const listInfo = await getListById(apiKey, listId);
-      if ('error' in listInfo && !('name' in listInfo)) {
-        return res.status(400).json({ error: listInfo.error });
+      let listName = "Unknown List";
+      let hubspotListId = listId;
+
+      if ('name' in listInfo) {
+        listName = listInfo.name;
+        hubspotListId = listInfo.listId;
       }
 
       // Save the list
       const list = await storage.createList({
         hubspotAccountId: accountId,
-        listId: (listInfo as any).listId,
-        listName: (listInfo as any).name
+        listId: hubspotListId,
+        listName: listName
       });
 
       res.json(list);
