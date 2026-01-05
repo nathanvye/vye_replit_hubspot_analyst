@@ -31,6 +31,9 @@ interface GBPAccount {
 
 const GBP_OAUTH_SCOPES = [
   'https://www.googleapis.com/auth/business.manage',
+  'openid',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/userinfo.profile',
 ];
 
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
