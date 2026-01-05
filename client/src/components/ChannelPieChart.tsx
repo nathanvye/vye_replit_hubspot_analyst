@@ -56,14 +56,13 @@ export function ChannelPieChart({ data, year }: ChannelPieChartProps) {
             <PieChart>
               <Pie
                 data={data}
-                cx="50%"
+                cx="35%"
                 cy="50%"
-                labelLine={false}
-                outerRadius={100}
+                labelLine={true}
+                outerRadius={80}
                 fill="#8884d8"
                 dataKey="sessions"
                 nameKey="channel"
-                label={({ channel, percentage }) => `${channel}: ${percentage}%`}
               >
                 {data.map((entry, index) => (
                   <Cell 
