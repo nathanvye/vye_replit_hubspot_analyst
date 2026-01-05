@@ -396,7 +396,10 @@ export function ReportView() {
       )}
 
       {/* Lifecycle Stages Section */}
-      {report.lifecycleStages && Object.keys(report.lifecycleStages.quarterlyBecame || {}).length > 0 && (
+      {report.lifecycleStages && (
+        Object.keys(report.lifecycleStages.quarterlyBecame || {}).length > 0 ||
+        Object.keys(report.lifecycleStages.currentCounts || {}).length > 0
+      ) && (
         <section className="space-y-4">
           <LifecycleStagesTable 
             data={report.lifecycleStages} 

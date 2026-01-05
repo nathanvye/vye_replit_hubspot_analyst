@@ -24,13 +24,15 @@ const STAGE_ORDER = [
 ];
 
 export function LifecycleStagesTable({ data, year }: LifecycleStagesTableProps) {
-  if (!data || !data.quarterlyBecame) {
+  if (!data || (!data.quarterlyBecame && !data.currentCounts)) {
     return null;
   }
 
-  const stages = STAGE_ORDER.filter(stage => 
-    data.quarterlyBecame[stage] && data.quarterlyBecame[stage].total > 0
-  );
+  const stages = STAGE_ORDER.filter(stage => {
+    const hasCurrentCount = (data.currentCounts?.[stage] || 0) > 0;
+    const hasQuarterlyData = data.quarterlyBecame?.[stage]?.total > 0;
+    return hasCurrentCount || hasQuarterlyData;
+  });
 
   if (stages.length === 0) {
     return null;
