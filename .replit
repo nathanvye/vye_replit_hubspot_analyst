@@ -42,3 +42,8 @@ waitForPort = 5000
 [agent]
 mockupState = "FULLSTACK"
 integrations = ["hubspot:1.0.0", "javascript_openai_ai_integrations:1.0.0"]
+
+[userenv]
+
+[userenv.shared]
+GOOGLE_SERVICE_ACCOUNT_KEY = "AIzaSyA2ABG22d4sPnxZ7and0czzMJ6c-B_CyHM"
