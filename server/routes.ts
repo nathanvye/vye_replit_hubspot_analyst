@@ -673,12 +673,20 @@ export async function registerRoutes(
     try {
       const { code, state, error } = req.query;
       
+      console.log("[GBP Callback] Received callback with:", { 
+        hasCode: !!code, 
+        hasState: !!state, 
+        error: error || "none",
+        fullQuery: req.query 
+      });
+      
       if (error) {
-        console.error("GBP OAuth error:", error);
+        console.error("[GBP Callback] OAuth error from Google:", error);
         return res.redirect("/settings?gbp_error=auth_denied");
       }
 
       if (!code || !state) {
+        console.log("[GBP Callback] Missing params - redirecting to error page");
         return res.redirect("/settings?gbp_error=missing_params");
       }
 
@@ -699,6 +707,7 @@ export async function registerRoutes(
         : 'http://localhost:5000';
       const redirectUri = `${baseUrl}/api/google-business-profile/callback`;
 
+      console.log("[GBP Callback] Exchanging code for tokens...");
       const tokens = await exchangeCodeForTokens(
         code as string,
         credentials.clientId,
@@ -707,8 +716,11 @@ export async function registerRoutes(
       );
 
       if (!tokens) {
+        console.error("[GBP Callback] Token exchange failed");
         return res.redirect("/settings?gbp_error=token_exchange_failed");
       }
+      
+      console.log("[GBP Callback] Token exchange successful, saving config...");
 
       const encryptedAccessToken = encrypt(tokens.accessToken);
       const encryptedRefreshToken = encrypt(tokens.refreshToken);
