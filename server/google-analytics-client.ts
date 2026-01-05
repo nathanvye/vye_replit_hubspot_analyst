@@ -28,13 +28,19 @@ function getQuarterDateRanges(year: number) {
 function getServiceAccountCredentials(): any | null {
   const credentialsJson = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
   if (!credentialsJson) {
+    console.log('GOOGLE_SERVICE_ACCOUNT_KEY environment variable is not set');
     return null;
   }
   
+  console.log('GOOGLE_SERVICE_ACCOUNT_KEY found, length:', credentialsJson.length);
+  
   try {
-    return JSON.parse(credentialsJson);
+    const parsed = JSON.parse(credentialsJson);
+    console.log('Successfully parsed service account key for:', parsed.client_email);
+    return parsed;
   } catch (error) {
-    console.error('Failed to parse GOOGLE_SERVICE_ACCOUNT_KEY:', error);
+    console.error('Failed to parse GOOGLE_SERVICE_ACCOUNT_KEY as JSON:', error);
+    console.log('First 100 chars of key:', credentialsJson.substring(0, 100));
     return null;
   }
 }
