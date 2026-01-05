@@ -127,24 +127,30 @@ export async function refreshAccessToken(
 
 export async function listGBPAccounts(accessToken: string): Promise<GBPAccount[]> {
   try {
-    const response = await fetch(`${GBP_ACCOUNT_API_BASE}/accounts`, {
+    const url = `${GBP_ACCOUNT_API_BASE}/accounts`;
+    console.log('[GBP] Fetching accounts from:', url);
+    
+    const response = await fetch(url, {
       headers: { 'Authorization': `Bearer ${accessToken}` },
     });
 
+    console.log('[GBP] Accounts API response status:', response.status);
+    
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Failed to list GBP accounts:', errorText);
+      console.error('[GBP] Failed to list accounts - Status:', response.status, 'Error:', errorText);
       return [];
     }
 
     const data = await response.json();
+    console.log('[GBP] Accounts found:', data.accounts?.length || 0);
     return (data.accounts || []).map((account: any) => ({
       name: account.name,
       accountName: account.accountName,
       type: account.type,
     }));
   } catch (error) {
-    console.error('Error listing GBP accounts:', error);
+    console.error('[GBP] Error listing accounts:', error);
     return [];
   }
 }
