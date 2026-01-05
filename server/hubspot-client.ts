@@ -206,6 +206,14 @@ export async function getContacts(
     "lastmodifieddate",
     "hubspot_owner_id",
     "lifecyclestage",
+    "hs_lifecyclestage_subscriber_date",
+    "hs_lifecyclestage_lead_date",
+    "hs_lifecyclestage_marketingqualifiedlead_date",
+    "hs_lifecyclestage_salesqualifiedlead_date",
+    "hs_lifecyclestage_opportunity_date",
+    "hs_lifecyclestage_customer_date",
+    "hs_lifecyclestage_evangelist_date",
+    "hs_lifecyclestage_other_date",
     "hs_lead_status",
     "jobtitle",
     "city",
@@ -1084,6 +1092,16 @@ export async function getComprehensiveData(
       phone: contact.properties.phone || "",
       owner: ownerId ? ownerMap.get(ownerId) || "Unknown" : "Unassigned",
       lifecycleStage: contact.properties.lifecyclestage || "",
+      lifecycleHistory: {
+        subscriber: contact.properties.hs_lifecyclestage_subscriber_date || null,
+        lead: contact.properties.hs_lifecyclestage_lead_date || null,
+        mql: contact.properties.hs_lifecyclestage_marketingqualifiedlead_date || null,
+        sql: contact.properties.hs_lifecyclestage_salesqualifiedlead_date || null,
+        opportunity: contact.properties.hs_lifecyclestage_opportunity_date || null,
+        customer: contact.properties.hs_lifecyclestage_customer_date || null,
+        evangelist: contact.properties.hs_lifecyclestage_evangelist_date || null,
+        other: contact.properties.hs_lifecyclestage_other_date || null,
+      },
       leadStatus: contact.properties.hs_lead_status || "",
       jobTitle: contact.properties.jobtitle || "",
       createDate: contact.properties.createdate,
@@ -1170,6 +1188,13 @@ export async function getComprehensiveData(
     if (q) companiesByQuarter[q]++;
   }
 
+  // Calculate lifecycle stage summary
+  const lifecycleSummary: Record<string, number> = {};
+  for (const contact of enrichedContacts) {
+    const stage = contact.lifecycleStage || "Unknown";
+    lifecycleSummary[stage] = (lifecycleSummary[stage] || 0) + 1;
+  }
+
   return {
     deals: enrichedDeals,
     contacts: enrichedContacts,
@@ -1181,6 +1206,7 @@ export async function getComprehensiveData(
       totalCompanies: enrichedCompanies.length,
       byOwner: ownerSummary,
       byStage: stageSummary,
+      byLifecycle: lifecycleSummary,
       owners: Array.from(ownerMap.entries()).map(([id, name]) => ({
         id,
         name,

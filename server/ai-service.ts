@@ -166,6 +166,9 @@ export async function generateReport(hubspotData: any, context: LearnedContext[]
 
   const gaQuarterlyDesc = `Page Views: Q1: ${gaPageViews.Q1}, Q2: ${gaPageViews.Q2}, Q3: ${gaPageViews.Q3}, Q4: ${gaPageViews.Q4}. Total: ${gaPageViews.total}`;
 
+  // Lifecycle stage summary
+  const lifecycleDesc = Object.entries(summary.byLifecycle || {}).map(([stage, count]: [string, any]) => `${stage}: ${count}`).join(', ');
+
   // Get current year and quarter
   const now = new Date();
   const currentYear = summary.quarterly?.year || now.getFullYear();
@@ -192,6 +195,7 @@ VERIFIED DATA (use these exact numbers - do NOT invent statistics):
 - Total Companies: ${formatNumber(companyCount)}
 - Website Traffic (Page Views): ${gaQuarterlyDesc}
 - Traffic Channels: ${gaChannelDesc || 'No channel data available'}
+- Contacts by Lifecycle Stage: ${lifecycleDesc || 'No lifecycle data available'}
 - Deals by Stage (sorted by value):
 - ${stageDescription || 'None'}
 - Deals by Owner: ${ownerDescription || 'None'}
@@ -299,6 +303,7 @@ CRITICAL: Every number you mention MUST include commas and come from the VERIFIE
     // Stage/owner breakdowns come from SERVER calculations
     dealsByStage,
     dealsByOwner,
+    lifecycleSummary: summary.byLifecycle || {},
     gaChannels,
     gaPageViews,
     // Only narrative text comes from AI (hallucination is tolerable here)
