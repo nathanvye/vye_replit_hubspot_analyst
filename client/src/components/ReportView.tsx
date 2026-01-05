@@ -5,9 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, RefreshCw, AlertCircle, ExternalLink, FileText, Target } from "lucide-react";
+import { Download, RefreshCw, AlertCircle, ExternalLink, FileText, Target, PieChart as PieChartIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import { KPITable } from "./KPITable";
+import { ChannelPieChart } from "./ChannelPieChart";
 import { cn } from "@/lib/utils";
 import { exportReportToWord } from "@/lib/exportToWord";
 import { useQuery } from "@tanstack/react-query";
@@ -57,6 +58,8 @@ interface ReportData {
   hubspotLists?: HubSpotListData[];
   dealsByStage?: StageData[];
   dealsByOwner?: { owner: string; count: number; value: number }[];
+  gaChannels?: any[];
+  gaPageViews?: any;
   revenueInsights?: string[];
   leadGenInsights?: string[];
   recommendations?: string[];
@@ -69,6 +72,7 @@ interface ReportData {
     closedWonValue: number;
     openDeals: number;
     openDealsValue: number;
+    pageViews?: number;
   };
 }
 
@@ -330,12 +334,59 @@ export function ReportView() {
                     <TableCell className="font-medium">Total Companies</TableCell>
                     <TableCell className="text-right font-mono">{verified.totalCompanies}</TableCell>
                   </TableRow>
+                  {verified.pageViews !== undefined && verified.pageViews > 0 && (
+                    <TableRow>
+                      <TableCell className="font-medium">Total Page Views</TableCell>
+                      <TableCell className="text-right font-mono font-bold text-blue-600">{verified.pageViews.toLocaleString()}</TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </div>
           </Card>
         )}
       </section>
+
+      {/* Traffic Analysis Section */}
+      {report.gaChannels && report.gaChannels.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <PieChartIcon className="w-5 h-5 text-[#5C3D5E]" />
+            <h2 className="text-xl font-semibold text-[#5C3D5E]">Traffic Analysis:</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <ChannelPieChart 
+              data={report.gaChannels} 
+              year={report.kpiTable?.year || currentYear} 
+            />
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg text-[#5C3D5E]">Channel Breakdown</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Channel</TableHead>
+                      <TableHead className="text-right">Sessions</TableHead>
+                      <TableHead className="text-right">%</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {report.gaChannels.map((channel, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="font-medium">{channel.channel}</TableCell>
+                        <TableCell className="text-right font-mono">{channel.sessions.toLocaleString()}</TableCell>
+                        <TableCell className="text-right font-mono">{channel.percentage}%</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+      )}
 
       {/* Insights Section */}
       <section className="space-y-6">

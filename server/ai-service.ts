@@ -105,7 +105,7 @@ function formatNumber(value: number): string {
   return value.toLocaleString('en-US');
 }
 
-export async function generateReport(hubspotData: any, context: LearnedContext[]): Promise<any> {
+export async function generateReport(hubspotData: any, context: LearnedContext[], gaData?: { pageViews: any, channels: any[] }): Promise<any> {
   const learnedContextPrompt = context.length > 0
     ? `\n\nCustom terminology:\n${context.map(lc => `- ${lc.key}: ${lc.value}`).join('\n')}`
     : '';
@@ -116,6 +116,11 @@ export async function generateReport(hubspotData: any, context: LearnedContext[]
   const contactCount = summary.totalContacts || 0;
   const companyCount = summary.totalCompanies || 0;
   const totalDealValue = summary.totalDealValue || 0;
+
+  // Google Analytics data
+  const gaPageViews = gaData?.pageViews || { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
+  const gaChannels = gaData?.channels || [];
+  const gaChannelDesc = gaChannels.map(c => `${c.channel}: ${c.sessions} sessions (${c.percentage}%)`).join(', ');
 
   // SERVER-SIDE: Build stage breakdown arrays (not from AI)
   const dealsByStage = Object.entries(summary.byStage || {}).map(([stage, data]: [string, any]) => ({
@@ -159,6 +164,8 @@ export async function generateReport(hubspotData: any, context: LearnedContext[]
     `Q4: ${summary.quarterly.contacts.Q4} contacts, ${summary.quarterly.deals.Q4} deals ($${summary.quarterly.dealValue.Q4.toFixed(0)}).`
     : 'No quarterly data available';
 
+  const gaQuarterlyDesc = `Page Views: Q1: ${gaPageViews.Q1}, Q2: ${gaPageViews.Q2}, Q3: ${gaPageViews.Q3}, Q4: ${gaPageViews.Q4}. Total: ${gaPageViews.total}`;
+
   // Get current year and quarter
   const now = new Date();
   const currentYear = summary.quarterly?.year || now.getFullYear();
@@ -173,7 +180,7 @@ export async function generateReport(hubspotData: any, context: LearnedContext[]
   });
   const currentQuarterValue = currentQuarterDeals.reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
 
-  const prompt = `Analyze this HubSpot CRM data and write detailed insights in a SPECIFIC FORMAT.
+  const prompt = `Analyze this HubSpot CRM and Google Analytics data and write detailed insights in a SPECIFIC FORMAT.
 
 VERIFIED DATA (use these exact numbers - do NOT invent statistics):
 - Total Deals: ${formatNumber(dealCount)}
@@ -183,10 +190,12 @@ VERIFIED DATA (use these exact numbers - do NOT invent statistics):
 - Open Deals in Pipeline: ${formatNumber(openDeals.length)} worth ${formatCurrency(openDealsValue)}
 - Total Contacts: ${formatNumber(contactCount)}
 - Total Companies: ${formatNumber(companyCount)}
+- Website Traffic (Page Views): ${gaQuarterlyDesc}
+- Traffic Channels: ${gaChannelDesc || 'No channel data available'}
 - Deals by Stage (sorted by value):
 - ${stageDescription || 'None'}
 - Deals by Owner: ${ownerDescription || 'None'}
-- Quarterly Breakdown (${currentYear}): ${quarterlyDesc}
+- Quarterly HubSpot Breakdown (${currentYear}): ${quarterlyDesc}
 ${learnedContextPrompt}
 
 Return JSON with insights formatted like these examples:
@@ -198,23 +207,19 @@ REVENUE GENERATION EXAMPLES (reference exact data with commas):
 
 LEAD GENERATION EXAMPLES (reference exact data with commas):
 - "YTD ${formatNumber(contactCount)} new contacts created in HubSpot."
+- "Website traffic reached ${formatNumber(gaPageViews.total)} page views YTD, with top channels being ${gaChannels.slice(0, 2).map(c => c.channel).join(' and ')}."
 - Mention QoQ trends if quarterly data shows patterns
 - Reference specific stage names and deal counts (not IDs)
 
 {
-  "revenueInsights": ["4-6 bullet points about revenue/deals using EXACT numbers with commas from verified data - focus on YTD totals, Q${currentQuarter} specifics, and pipeline value by stage"],
-  "leadGenInsights": ["4-6 bullet points about contacts/leads using EXACT numbers with commas - mention QoQ trends, quarterly patterns, and contact growth"],
+  "revenueInsights": ["4-6 bullet points about revenue/deals using EXACT numbers with commas from verified data"],
+  "leadGenInsights": ["4-6 bullet points about contacts/leads/website-traffic using EXACT numbers with commas"],
   "recommendations": ["5-7 specific, actionable recommendations"]
 }
 
 RECOMMENDATIONS SHOULD BE SPECIFIC AND ACTIONABLE like these examples:
 - "Lean into [top stage/product] to drive profitability. Could support with sales enablement messaging, battle cards, sell sheets, etc."
-- "Consider a [specific product] branch of the product identifier."
-- "[Stage/Product X] becoming a close runner-up to [Stage/Product Y] and often with larger deals. Lean heavy into this in the next quarter."
-- "Consider repurposing webinar content across social media and email campaigns to drive TOF contacts toward lower-funnel education."
-- "Contact growth patterns suggest a content offer or webinar specifically for [audience segment] may prove worthwhile."
-- Suggest specific campaign ideas (holiday campaigns, EOY pushes, exclusivity angles) tied to deal value patterns
-- Reference specific stage names (not IDs), deal counts, or owner performance from the data
+- "Contact growth patterns and traffic from [Channel] suggest a content offer or webinar specifically for [audience segment] may prove worthwhile."
 
 CRITICAL: Every number you mention MUST include commas and come from the VERIFIED DATA above. Use stage names not IDs. Do not invent statistics. Recommendations should reference actual patterns in the data.`;
 
@@ -262,7 +267,8 @@ CRITICAL: Every number you mention MUST include commas and come from the VERIFIE
       closedWonDeals: closedWonDeals.length,
       closedWonValue: closedWonValue,
       openDeals: openDeals.length,
-      openDealsValue: openDealsValue
+      openDealsValue: openDealsValue,
+      pageViews: gaPageViews.total
     },
     // Quarterly KPI data for the table (SERVER calculated)
     kpiTable: {
@@ -277,12 +283,24 @@ CRITICAL: Every number you mention MUST include commas and come from the VERIFIE
           q3: { projection: '-', actual: quarterly.contacts.Q3 },
           q4: { projection: '-', actual: quarterly.contacts.Q4 },
           goal: ''
+        },
+        {
+          metric: "Page Views",
+          subtext: `Website traffic from Google Analytics (${quarterly.year})`,
+          yearEndProjection: gaPageViews.total,
+          q1: { projection: '-', actual: gaPageViews.Q1 },
+          q2: { projection: '-', actual: gaPageViews.Q2 },
+          q3: { projection: '-', actual: gaPageViews.Q3 },
+          q4: { projection: '-', actual: gaPageViews.Q4 },
+          goal: ''
         }
       ]
     },
     // Stage/owner breakdowns come from SERVER calculations
     dealsByStage,
     dealsByOwner,
+    gaChannels,
+    gaPageViews,
     // Only narrative text comes from AI (hallucination is tolerable here)
     revenueInsights: aiInsights.revenueInsights || [],
     leadGenInsights: aiInsights.leadGenInsights || [],

@@ -790,11 +790,26 @@ export async function registerRoutes(
         }
       }
       
-      const reportData = await generateReport(hubspotData, learnedContext);
+      // Fetch Google Analytics data if configured
+      let gaPageViews = { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
+      let gaChannels: any[] = [];
+      const gaConfig = await storage.getGoogleAnalyticsConfig(hubspotAccountId);
+      if (gaConfig && gaConfig.propertyId) {
+        try {
+          gaPageViews = await getPageViewsQuarterly(gaConfig.propertyId, reportYear);
+          gaChannels = await getChannelGroupBreakdown(gaConfig.propertyId, reportYear);
+        } catch (err) {
+          console.error("Error fetching GA data for report:", err);
+        }
+      }
+
+      const reportData = await generateReport(hubspotData, learnedContext, { pageViews: gaPageViews, channels: gaChannels });
       
       // Add form submissions and lists to report data
       (reportData as any).formSubmissions = formSubmissionsData;
       (reportData as any).hubspotLists = listsData;
+      (reportData as any).gaChannels = gaChannels;
+      (reportData as any).gaPageViews = gaPageViews;
 
       const report = await storage.createReport({
         conversationId: conversationId || null,
