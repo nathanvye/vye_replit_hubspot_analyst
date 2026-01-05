@@ -1080,12 +1080,22 @@ export async function getLifecycleStageBreakdown(
     quarterlyBecame[stage.label] = { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
   }
 
-  const getQuarter = (dateValue: string | number | null): "Q1" | "Q2" | "Q3" | "Q4" | null => {
-    if (!dateValue) return null;
-    const date = new Date(typeof dateValue === 'number' ? dateValue : dateValue);
-    if (isNaN(date.getTime())) return null;
-    if (date.getFullYear() !== year) return null;
-    const month = date.getMonth();
+  const getQuarter = (dateValue: string | number): "Q1" | "Q2" | "Q3" | "Q4" | null => {
+    // If the value is a string, check if it's a numeric string (timestamp)
+    let finalDate: Date;
+    if (typeof dateValue === 'string') {
+      if (/^\d+$/.test(dateValue)) {
+        finalDate = new Date(parseInt(dateValue));
+      } else {
+        finalDate = new Date(dateValue);
+      }
+    } else {
+      finalDate = new Date(dateValue);
+    }
+
+    if (isNaN(finalDate.getTime())) return null;
+    if (finalDate.getFullYear() !== year) return null;
+    const month = finalDate.getMonth();
     if (month < 3) return "Q1";
     if (month < 6) return "Q2";
     if (month < 9) return "Q3";
@@ -1104,7 +1114,10 @@ export async function getLifecycleStageBreakdown(
     // Count "became X" dates per quarter
     for (const stage of lifecycleStages) {
       const becameValue = contact.properties[stage.dateField as keyof typeof contact.properties];
-      const quarter = getQuarter(becameValue as string | number | null);
+      // HubSpot sometimes returns empty strings, null, or "0" for dates that haven't occurred
+      if (!becameValue || becameValue === "0" || becameValue === "") continue;
+      
+      const quarter = getQuarter(becameValue as string | number);
       if (quarter) {
         quarterlyBecame[stage.label][quarter]++;
         quarterlyBecame[stage.label].total++;
