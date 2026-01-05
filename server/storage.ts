@@ -12,7 +12,8 @@ import type {
   InsertHubspotList, HubspotList,
   InsertFormGoal, FormGoal,
   InsertKpiGoal, KpiGoal,
-  InsertGoogleAnalyticsConfig, GoogleAnalyticsConfig
+  InsertGoogleAnalyticsConfig, GoogleAnalyticsConfig,
+  InsertGoogleBusinessProfileConfig, GoogleBusinessProfileConfig
 } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 
@@ -80,6 +81,12 @@ export interface IStorage {
   // Google Analytics Config
   getGoogleAnalyticsConfig(hubspotAccountId: string): Promise<GoogleAnalyticsConfig | undefined>;
   upsertGoogleAnalyticsConfig(config: InsertGoogleAnalyticsConfig): Promise<GoogleAnalyticsConfig>;
+
+  // Google Business Profile Config
+  getGoogleBusinessProfileConfig(hubspotAccountId: string): Promise<GoogleBusinessProfileConfig | undefined>;
+  upsertGoogleBusinessProfileConfig(config: InsertGoogleBusinessProfileConfig): Promise<GoogleBusinessProfileConfig>;
+  updateGoogleBusinessProfileTokens(hubspotAccountId: string, accessToken: string, tokenExpiry: Date): Promise<void>;
+  deleteGoogleBusinessProfileConfig(hubspotAccountId: string): Promise<void>;
 }
 
 class Storage implements IStorage {
@@ -333,6 +340,47 @@ class Storage implements IStorage {
     }
     const result = await db.insert(schema.googleAnalyticsConfig).values(config).returning();
     return result[0];
+  }
+
+  // Google Business Profile Config
+  async getGoogleBusinessProfileConfig(hubspotAccountId: string): Promise<GoogleBusinessProfileConfig | undefined> {
+    const result = await db.select()
+      .from(schema.googleBusinessProfileConfig)
+      .where(eq(schema.googleBusinessProfileConfig.hubspotAccountId, hubspotAccountId))
+      .limit(1);
+    return result[0];
+  }
+
+  async upsertGoogleBusinessProfileConfig(config: InsertGoogleBusinessProfileConfig): Promise<GoogleBusinessProfileConfig> {
+    const existing = await this.getGoogleBusinessProfileConfig(config.hubspotAccountId);
+    if (existing) {
+      const result = await db.update(schema.googleBusinessProfileConfig)
+        .set({
+          accountId: config.accountId,
+          locationId: config.locationId,
+          locationName: config.locationName,
+          accessToken: config.accessToken,
+          refreshToken: config.refreshToken,
+          tokenExpiry: config.tokenExpiry,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.googleBusinessProfileConfig.id, existing.id))
+        .returning();
+      return result[0];
+    }
+    const result = await db.insert(schema.googleBusinessProfileConfig).values(config).returning();
+    return result[0];
+  }
+
+  async updateGoogleBusinessProfileTokens(hubspotAccountId: string, accessToken: string, tokenExpiry: Date): Promise<void> {
+    await db.update(schema.googleBusinessProfileConfig)
+      .set({ accessToken, tokenExpiry, updatedAt: new Date() })
+      .where(eq(schema.googleBusinessProfileConfig.hubspotAccountId, hubspotAccountId));
+  }
+
+  async deleteGoogleBusinessProfileConfig(hubspotAccountId: string): Promise<void> {
+    await db.delete(schema.googleBusinessProfileConfig)
+      .where(eq(schema.googleBusinessProfileConfig.hubspotAccountId, hubspotAccountId));
   }
 }
 

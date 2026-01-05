@@ -83,6 +83,8 @@ Preferred communication style: Simple, everyday language.
 - `GOOGLE_CLIENT_SECRET` - Google OAuth 2.0 Client Secret
 - `ENCRYPTION_KEY` - Used for encrypting stored HubSpot API keys (falls back to SESSION_SECRET)
 - `GOOGLE_SERVICE_ACCOUNT_KEY` - (Optional) JSON service account key for Google Analytics Data API
+- `GBP_CLIENT_ID` - (Optional) Google Business Profile OAuth Client ID
+- `GBP_CLIENT_SECRET` - (Optional) Google Business Profile OAuth Client Secret
 
 ### Google Analytics Integration (Optional)
 
@@ -132,3 +134,33 @@ Website sessions use the HubSpot Reports API v2.
 **Troubleshooting:**
 - Check server logs for the list of available reports and API response details
 - If no reports are found, you may need to create a sessions report in HubSpot first
+
+### Google Business Profile Integration (Optional)
+
+To enable Google Business Profile data in reports (ratings, reviews, business details):
+
+1. **Create OAuth 2.0 Credentials** in Google Cloud Console:
+   - Go to APIs & Services → Credentials → Create Credentials → OAuth 2.0 Client ID
+   - Application type: Web application
+   - Add authorized redirect URI: `https://your-domain/api/google-business-profile/callback`
+   - Enable the "My Business Business Information API" in APIs & Services → Library
+
+2. **Configure Environment Variables**:
+   - Set `GBP_CLIENT_ID` to your OAuth Client ID
+   - Set `GBP_CLIENT_SECRET` to your OAuth Client Secret
+
+3. **Connect in Settings**:
+   - Go to Settings → Google Business Profile
+   - Click "Connect Google Business Profile"
+   - Sign in with a Google account that has Owner/Manager access to the business listing
+   - Select the business location to connect
+
+The integration provides:
+- Business name and address
+- Star rating and total review count
+- Business categories
+- Phone number and website
+- Business hours
+- Link to Google Maps listing
+
+**Note**: The business must be verified on Google for the integration to work.

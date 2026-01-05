@@ -19,6 +19,16 @@ import {
 import { analyzeWithAI, generateReport, extractLearning } from "./ai-service";
 import { encrypt, decrypt } from "./encryption";
 import { getPageViewsQuarterly, getChannelGroupBreakdown, isGoogleAnalyticsConfigured } from "./google-analytics-client";
+import { 
+  isGBPConfigured, 
+  getGBPClientCredentials, 
+  getGBPAuthUrl, 
+  exchangeCodeForTokens, 
+  refreshAccessToken,
+  listGBPAccounts,
+  listGBPLocations,
+  getGBPBusinessInfo
+} from "./google-business-profile-client";
 import { z } from "zod";
 
 // Helper to get API key for a HubSpot account
@@ -573,6 +583,309 @@ export async function registerRoutes(
   });
 
   // ==========================================
+  // Google Business Profile
+  // ==========================================
+
+  app.get("/api/google-business-profile/status", (req, res) => {
+    res.json({ 
+      configured: isGBPConfigured(),
+      message: isGBPConfigured() 
+        ? "Google Business Profile OAuth is configured" 
+        : "Google Business Profile OAuth not configured. Set GBP_CLIENT_ID and GBP_CLIENT_SECRET environment variables."
+    });
+  });
+
+  app.get("/api/google-business-profile/config/:accountId", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const config = await storage.getGoogleBusinessProfileConfig(accountId);
+      if (config && config.accessToken) {
+        res.json({
+          configured: true,
+          connected: !!config.locationId,
+          locationName: config.locationName || null,
+          locationId: config.locationId || null,
+          accountId: config.accountId || null,
+          hasTokens: !!config.accessToken,
+        });
+      } else {
+        res.json({ configured: false, connected: false });
+      }
+    } catch (error) {
+      console.error("Error fetching GBP config:", error);
+      res.status(500).json({ error: "Failed to fetch Google Business Profile config" });
+    }
+  });
+
+  app.get("/api/google-business-profile/auth-url/:accountId", (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const credentials = getGBPClientCredentials();
+      
+      if (!credentials) {
+        return res.status(400).json({ error: "Google Business Profile OAuth not configured" });
+      }
+
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : 'http://localhost:5000';
+      const redirectUri = `${baseUrl}/api/google-business-profile/callback`;
+      const state = Buffer.from(JSON.stringify({ accountId })).toString('base64');
+      
+      const authUrl = getGBPAuthUrl(credentials.clientId, redirectUri, state);
+      res.json({ authUrl });
+    } catch (error) {
+      console.error("Error generating GBP auth URL:", error);
+      res.status(500).json({ error: "Failed to generate auth URL" });
+    }
+  });
+
+  // Direct OAuth initiation endpoint - redirects to Google auth
+  app.get("/api/google-business-profile/auth", (req, res) => {
+    try {
+      const { hubspotAccountId } = req.query;
+      
+      if (!hubspotAccountId) {
+        return res.redirect("/settings?gbp_error=missing_account");
+      }
+
+      const credentials = getGBPClientCredentials();
+      
+      if (!credentials) {
+        return res.redirect("/settings?gbp_error=not_configured");
+      }
+
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : 'http://localhost:5000';
+      const redirectUri = `${baseUrl}/api/google-business-profile/callback`;
+      const state = Buffer.from(JSON.stringify({ accountId: hubspotAccountId })).toString('base64');
+      
+      const authUrl = getGBPAuthUrl(credentials.clientId, redirectUri, state);
+      res.redirect(authUrl);
+    } catch (error) {
+      console.error("Error starting GBP auth:", error);
+      res.redirect("/settings?gbp_error=auth_failed");
+    }
+  });
+
+  app.get("/api/google-business-profile/callback", async (req, res) => {
+    try {
+      const { code, state, error } = req.query;
+      
+      if (error) {
+        console.error("GBP OAuth error:", error);
+        return res.redirect("/settings?gbp_error=auth_denied");
+      }
+
+      if (!code || !state) {
+        return res.redirect("/settings?gbp_error=missing_params");
+      }
+
+      const credentials = getGBPClientCredentials();
+      if (!credentials) {
+        return res.redirect("/settings?gbp_error=not_configured");
+      }
+
+      let stateData: { accountId: string };
+      try {
+        stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
+      } catch (e) {
+        return res.redirect("/settings?gbp_error=invalid_state");
+      }
+
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : 'http://localhost:5000';
+      const redirectUri = `${baseUrl}/api/google-business-profile/callback`;
+
+      const tokens = await exchangeCodeForTokens(
+        code as string,
+        credentials.clientId,
+        credentials.clientSecret,
+        redirectUri
+      );
+
+      if (!tokens) {
+        return res.redirect("/settings?gbp_error=token_exchange_failed");
+      }
+
+      const encryptedAccessToken = encrypt(tokens.accessToken);
+      const encryptedRefreshToken = encrypt(tokens.refreshToken);
+      const tokenExpiry = new Date(Date.now() + tokens.expiresIn * 1000);
+
+      await storage.upsertGoogleBusinessProfileConfig({
+        hubspotAccountId: stateData.accountId,
+        accessToken: encryptedAccessToken,
+        refreshToken: encryptedRefreshToken,
+        tokenExpiry,
+      });
+
+      res.redirect("/settings?gbp_success=true");
+    } catch (error) {
+      console.error("GBP OAuth callback error:", error);
+      res.redirect("/settings?gbp_error=callback_failed");
+    }
+  });
+
+  app.get("/api/google-business-profile/accounts/:accountId", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const config = await storage.getGoogleBusinessProfileConfig(accountId);
+      
+      if (!config || !config.accessToken || !config.refreshToken) {
+        return res.status(400).json({ error: "Not connected to Google Business Profile" });
+      }
+
+      let accessToken = decrypt(config.accessToken);
+      
+      if (config.tokenExpiry && new Date(config.tokenExpiry) < new Date()) {
+        const credentials = getGBPClientCredentials();
+        if (!credentials) {
+          return res.status(400).json({ error: "OAuth not configured" });
+        }
+        
+        const newTokens = await refreshAccessToken(
+          decrypt(config.refreshToken),
+          credentials.clientId,
+          credentials.clientSecret
+        );
+        
+        if (!newTokens) {
+          return res.status(401).json({ error: "Failed to refresh token. Please reconnect." });
+        }
+        
+        accessToken = newTokens.accessToken;
+        const newExpiry = new Date(Date.now() + newTokens.expiresIn * 1000);
+        await storage.updateGoogleBusinessProfileTokens(accountId, encrypt(accessToken), newExpiry);
+      }
+
+      const accounts = await listGBPAccounts(accessToken);
+      res.json({ accounts });
+    } catch (error) {
+      console.error("Error fetching GBP accounts:", error);
+      res.status(500).json({ error: "Failed to fetch Google Business Profile accounts" });
+    }
+  });
+
+  app.get("/api/google-business-profile/locations/:accountId/:gbpAccountId", async (req, res) => {
+    try {
+      const { accountId, gbpAccountId } = req.params;
+      const config = await storage.getGoogleBusinessProfileConfig(accountId);
+      
+      if (!config || !config.accessToken) {
+        return res.status(400).json({ error: "Not connected to Google Business Profile" });
+      }
+
+      let accessToken = decrypt(config.accessToken);
+      
+      if (config.tokenExpiry && new Date(config.tokenExpiry) < new Date()) {
+        const credentials = getGBPClientCredentials();
+        if (!credentials) {
+          return res.status(400).json({ error: "OAuth not configured" });
+        }
+        
+        const newTokens = await refreshAccessToken(
+          decrypt(config.refreshToken!),
+          credentials.clientId,
+          credentials.clientSecret
+        );
+        
+        if (!newTokens) {
+          return res.status(401).json({ error: "Failed to refresh token. Please reconnect." });
+        }
+        
+        accessToken = newTokens.accessToken;
+        const newExpiry = new Date(Date.now() + newTokens.expiresIn * 1000);
+        await storage.updateGoogleBusinessProfileTokens(accountId, encrypt(accessToken), newExpiry);
+      }
+
+      const locations = await listGBPLocations(accessToken, gbpAccountId);
+      res.json({ locations });
+    } catch (error) {
+      console.error("Error fetching GBP locations:", error);
+      res.status(500).json({ error: "Failed to fetch locations" });
+    }
+  });
+
+  app.post("/api/google-business-profile/select-location", async (req, res) => {
+    try {
+      const { hubspotAccountId, gbpAccountId, locationId, locationName } = req.body;
+      
+      const config = await storage.getGoogleBusinessProfileConfig(hubspotAccountId);
+      if (!config) {
+        return res.status(400).json({ error: "Not connected to Google Business Profile" });
+      }
+
+      await storage.upsertGoogleBusinessProfileConfig({
+        hubspotAccountId,
+        accountId: gbpAccountId,
+        locationId,
+        locationName,
+        accessToken: config.accessToken,
+        refreshToken: config.refreshToken,
+        tokenExpiry: config.tokenExpiry,
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error selecting GBP location:", error);
+      res.status(500).json({ error: "Failed to select location" });
+    }
+  });
+
+  app.delete("/api/google-business-profile/disconnect/:accountId", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      await storage.deleteGoogleBusinessProfileConfig(accountId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error disconnecting GBP:", error);
+      res.status(500).json({ error: "Failed to disconnect" });
+    }
+  });
+
+  app.get("/api/google-business-profile/data/:accountId", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const config = await storage.getGoogleBusinessProfileConfig(accountId);
+      
+      if (!config || !config.accessToken || !config.locationId) {
+        return res.json({ configured: false, data: null });
+      }
+
+      let accessToken = decrypt(config.accessToken);
+      
+      if (config.tokenExpiry && new Date(config.tokenExpiry) < new Date()) {
+        const credentials = getGBPClientCredentials();
+        if (!credentials) {
+          return res.json({ configured: false, data: null, error: "OAuth not configured" });
+        }
+        
+        const newTokens = await refreshAccessToken(
+          decrypt(config.refreshToken!),
+          credentials.clientId,
+          credentials.clientSecret
+        );
+        
+        if (!newTokens) {
+          return res.json({ configured: false, data: null, error: "Token refresh failed" });
+        }
+        
+        accessToken = newTokens.accessToken;
+        const newExpiry = new Date(Date.now() + newTokens.expiresIn * 1000);
+        await storage.updateGoogleBusinessProfileTokens(accountId, encrypt(accessToken), newExpiry);
+      }
+
+      const businessInfo = await getGBPBusinessInfo(accessToken, config.locationId);
+      res.json({ configured: true, data: businessInfo });
+    } catch (error) {
+      console.error("Error fetching GBP data:", error);
+      res.status(500).json({ error: "Failed to fetch business profile data" });
+    }
+  });
+
+  // ==========================================
   // Conversations
   // ==========================================
 
@@ -815,6 +1128,36 @@ export async function registerRoutes(
         console.error("Error fetching lifecycle data for report:", err);
       }
 
+      // Fetch Google Business Profile data if configured
+      let gbpData: any = null;
+      try {
+        const gbpConfig = await storage.getGoogleBusinessProfileConfig(hubspotAccountId);
+        if (gbpConfig && gbpConfig.accessToken && gbpConfig.locationId) {
+          let accessToken = decrypt(gbpConfig.accessToken);
+          
+          if (gbpConfig.tokenExpiry && new Date(gbpConfig.tokenExpiry) < new Date()) {
+            const credentials = getGBPClientCredentials();
+            if (credentials && gbpConfig.refreshToken) {
+              const newTokens = await refreshAccessToken(
+                decrypt(gbpConfig.refreshToken),
+                credentials.clientId,
+                credentials.clientSecret
+              );
+              
+              if (newTokens) {
+                accessToken = newTokens.accessToken;
+                const newExpiry = new Date(Date.now() + newTokens.expiresIn * 1000);
+                await storage.updateGoogleBusinessProfileTokens(hubspotAccountId, encrypt(accessToken), newExpiry);
+              }
+            }
+          }
+
+          gbpData = await getGBPBusinessInfo(accessToken, gbpConfig.locationId);
+        }
+      } catch (err) {
+        console.error("Error fetching GBP data for report:", err);
+      }
+
       const reportData = await generateReport(hubspotData, learnedContext, { pageViews: gaPageViews, channels: gaChannels });
       
       // Add form submissions and lists to report data
@@ -823,6 +1166,7 @@ export async function registerRoutes(
       (reportData as any).gaChannels = gaChannels;
       (reportData as any).gaPageViews = gaPageViews;
       (reportData as any).lifecycleStages = lifecycleData;
+      (reportData as any).googleBusinessProfile = gbpData;
 
       const report = await storage.createReport({
         conversationId: conversationId || null,

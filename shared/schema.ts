@@ -168,6 +168,28 @@ export const insertGoogleAnalyticsConfigSchema = createInsertSchema(googleAnalyt
 export type InsertGoogleAnalyticsConfig = z.infer<typeof insertGoogleAnalyticsConfigSchema>;
 export type GoogleAnalyticsConfig = typeof googleAnalyticsConfig.$inferSelect;
 
+// Google Business Profile configuration per HubSpot account
+export const googleBusinessProfileConfig = pgTable("google_business_profile_config", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  hubspotAccountId: varchar("hubspot_account_id").notNull().references(() => hubspotAccounts.id, { onDelete: "cascade" }),
+  accountId: text("account_id"), // GBP account ID (e.g., "accounts/123456789")
+  locationId: text("location_id"), // GBP location ID (e.g., "locations/123456789")
+  locationName: text("location_name"), // Display name for the location
+  accessToken: text("access_token"), // Encrypted OAuth access token
+  refreshToken: text("refresh_token"), // Encrypted OAuth refresh token
+  tokenExpiry: timestamp("token_expiry"), // When the access token expires
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertGoogleBusinessProfileConfigSchema = createInsertSchema(googleBusinessProfileConfig).omit({ 
+  id: true, 
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertGoogleBusinessProfileConfig = z.infer<typeof insertGoogleBusinessProfileConfigSchema>;
+export type GoogleBusinessProfileConfig = typeof googleBusinessProfileConfig.$inferSelect;
+
 // KPI Goals - quarterly targets for overall metrics per year
 export const kpiGoals = pgTable("kpi_goals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

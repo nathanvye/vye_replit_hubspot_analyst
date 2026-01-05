@@ -25,7 +25,11 @@ import {
   ChevronDown,
   ChevronUp,
   Save,
-  Loader2
+  Loader2,
+  Building2,
+  ExternalLink,
+  Star,
+  Unplug
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -106,6 +110,21 @@ export default function SettingsPage() {
   const [gaConfigured, setGaConfigured] = useState(false);
   const [gaServerConfigured, setGaServerConfigured] = useState<boolean | null>(null);
 
+  // Google Business Profile state
+  const [gbpConnected, setGbpConnected] = useState(false);
+  const [gbpLocationName, setGbpLocationName] = useState<string>("");
+  const [gbpServerConfigured, setGbpServerConfigured] = useState<boolean | null>(null);
+  const [isConnectingGbp, setIsConnectingGbp] = useState(false);
+  const [isDisconnectingGbp, setIsDisconnectingGbp] = useState(false);
+  const [gbpHasTokens, setGbpHasTokens] = useState(false);
+  const [gbpAccounts, setGbpAccounts] = useState<{ name: string; accountNumber: string }[]>([]);
+  const [gbpLocations, setGbpLocations] = useState<{ name: string; title: string; address: string }[]>([]);
+  const [selectedGbpAccount, setSelectedGbpAccount] = useState<string>("");
+  const [selectedGbpLocation, setSelectedGbpLocation] = useState<string>("");
+  const [isLoadingGbpAccounts, setIsLoadingGbpAccounts] = useState(false);
+  const [isLoadingGbpLocations, setIsLoadingGbpLocations] = useState(false);
+  const [isSavingGbpLocation, setIsSavingGbpLocation] = useState(false);
+
   useEffect(() => {
     if (!user || !selectedAccount) {
       setLocation("/");
@@ -117,6 +136,7 @@ export default function SettingsPage() {
     loadAvailableLists();
     loadKpiGoals();
     loadGaConfig();
+    loadGbpConfig();
   }, [user, selectedAccount, setLocation]);
 
   const loadGaConfig = async () => {
@@ -177,6 +197,190 @@ export default function SettingsPage() {
       });
     } finally {
       setIsSavingGaConfig(false);
+    }
+  };
+
+  const loadGbpConfig = async () => {
+    if (!selectedAccount) return;
+    try {
+      // Check server-level GBP configuration (OAuth credentials)
+      const statusResponse = await fetch("/api/google-business-profile/status");
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json();
+        setGbpServerConfigured(statusData.configured);
+      }
+
+      // Check account-level GBP configuration
+      const response = await fetch(`/api/google-business-profile/config/${selectedAccount}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.connected) {
+          setGbpConnected(true);
+          setGbpLocationName(data.locationName || "Connected Location");
+          setGbpHasTokens(true);
+        } else if (data && data.hasTokens) {
+          // User has authenticated but hasn't selected a location yet
+          setGbpHasTokens(true);
+          setGbpConnected(false);
+          // Load accounts for selection
+          loadGbpAccounts();
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load GBP config:", error);
+    }
+  };
+
+  const loadGbpAccounts = async () => {
+    if (!selectedAccount) return;
+    setIsLoadingGbpAccounts(true);
+    try {
+      const response = await fetch(`/api/google-business-profile/accounts/${selectedAccount}`);
+      if (response.ok) {
+        const data = await response.json();
+        setGbpAccounts(data.accounts || []);
+        // If there's only one account, auto-select it
+        if (data.accounts && data.accounts.length === 1) {
+          setSelectedGbpAccount(data.accounts[0].name);
+          loadGbpLocations(data.accounts[0].name);
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to load Google Business accounts",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Failed to load GBP accounts:", error);
+    } finally {
+      setIsLoadingGbpAccounts(false);
+    }
+  };
+
+  const loadGbpLocations = async (accountName: string) => {
+    if (!selectedAccount || !accountName) return;
+    setIsLoadingGbpLocations(true);
+    setGbpLocations([]);
+    try {
+      // Extract account ID from the full name (e.g., "accounts/123456789")
+      const accountId = accountName.replace("accounts/", "");
+      const response = await fetch(`/api/google-business-profile/locations/${selectedAccount}/${accountId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setGbpLocations(data.locations || []);
+        // If there's only one location, auto-select it
+        if (data.locations && data.locations.length === 1) {
+          setSelectedGbpLocation(data.locations[0].name);
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to load business locations",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Failed to load GBP locations:", error);
+    } finally {
+      setIsLoadingGbpLocations(false);
+    }
+  };
+
+  const handleSelectGbpAccount = (accountName: string) => {
+    setSelectedGbpAccount(accountName);
+    setSelectedGbpLocation("");
+    loadGbpLocations(accountName);
+  };
+
+  const handleSaveGbpLocation = async () => {
+    if (!selectedAccount || !selectedGbpLocation) return;
+    setIsSavingGbpLocation(true);
+    try {
+      const location = gbpLocations.find(l => l.name === selectedGbpLocation);
+      const response = await fetch("/api/google-business-profile/select-location", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hubspotAccountId: selectedAccount,
+          locationId: selectedGbpLocation,
+          locationName: location?.title || "Business Location"
+        })
+      });
+
+      if (response.ok) {
+        setGbpConnected(true);
+        setGbpLocationName(location?.title || "Business Location");
+        setGbpAccounts([]);
+        setGbpLocations([]);
+        toast({
+          title: "Connected",
+          description: "Google Business Profile connected successfully."
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to save location selection",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save location. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSavingGbpLocation(false);
+    }
+  };
+
+  const handleConnectGbp = async () => {
+    if (!selectedAccount) return;
+    setIsConnectingGbp(true);
+    try {
+      // Redirect to OAuth flow
+      window.location.href = `/api/google-business-profile/auth?hubspotAccountId=${selectedAccount}`;
+    } catch (error) {
+      setIsConnectingGbp(false);
+      toast({
+        title: "Error",
+        description: "Failed to start connection. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDisconnectGbp = async () => {
+    if (!selectedAccount) return;
+    setIsDisconnectingGbp(true);
+    try {
+      const response = await fetch(`/api/google-business-profile/disconnect/${selectedAccount}`, {
+        method: "DELETE"
+      });
+
+      if (response.ok) {
+        setGbpConnected(false);
+        setGbpLocationName("");
+        toast({
+          title: "Disconnected",
+          description: "Google Business Profile has been disconnected."
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to disconnect. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to disconnect. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDisconnectingGbp(false);
     }
   };
 
@@ -977,6 +1181,120 @@ export default function SettingsPage() {
                     </ol>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Building2 className="w-5 h-5" />
+                      Google Business Profile
+                    </CardTitle>
+                    <CardDescription>
+                      Connect your Google Business Profile to include ratings and business details in reports.
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {gbpServerConfigured === false && (
+                      <div className="flex items-center gap-2 text-xs text-amber-600">
+                        <span className="w-2 h-2 rounded-full bg-amber-500" />
+                        Setup Required
+                      </div>
+                    )}
+                    {gbpServerConfigured && gbpConnected && (
+                      <div className="flex items-center gap-2 text-xs text-green-600">
+                        <span className="w-2 h-2 rounded-full bg-green-500" />
+                        Connected
+                      </div>
+                    )}
+                    {gbpServerConfigured && !gbpConnected && (
+                      <div className="flex items-center gap-2 text-xs text-blue-600">
+                        <span className="w-2 h-2 rounded-full bg-blue-500" />
+                        Ready to Connect
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {gbpServerConfigured === false && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                    <p className="font-medium mb-2">OAuth Credentials Required</p>
+                    <p className="text-xs">
+                      To enable Google Business Profile integration, OAuth credentials need to be configured. Contact your administrator to set up GBP_CLIENT_ID and GBP_CLIENT_SECRET.
+                    </p>
+                  </div>
+                )}
+                
+                {gbpConnected ? (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                            <Star className="w-5 h-5 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-green-900">{gbpLocationName}</p>
+                            <p className="text-xs text-green-700">Business profile connected</p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleDisconnectGbp}
+                          disabled={isDisconnectingGbp}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          data-testid="button-disconnect-gbp"
+                        >
+                          {isDisconnectingGbp ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          ) : (
+                            <Unplug className="w-4 h-4 mr-2" />
+                          )}
+                          Disconnect
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Your Google Business Profile data (ratings, reviews, business info) will be included in generated reports.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <Button
+                      onClick={handleConnectGbp}
+                      disabled={isConnectingGbp || gbpServerConfigured === false}
+                      className="w-full"
+                      data-testid="button-connect-gbp"
+                    >
+                      {isConnectingGbp ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          Connecting...
+                        </>
+                      ) : (
+                        <>
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          Connect Google Business Profile
+                        </>
+                      )}
+                    </Button>
+                    <div className="p-4 bg-muted/30 rounded-lg space-y-3">
+                      <p className="text-sm font-semibold">What you'll need:</p>
+                      <ul className="text-xs space-y-2 list-disc ml-4 text-muted-foreground">
+                        <li>A Google account with access to your business profile</li>
+                        <li>Owner or Manager permissions on the business listing</li>
+                        <li>The business must be verified on Google</li>
+                      </ul>
+                      <p className="text-xs text-muted-foreground mt-3">
+                        Clicking "Connect" will redirect you to Google to authorize access. You'll be able to select which business location to connect.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

@@ -10,6 +10,7 @@ import { motion } from "framer-motion";
 import { KPITable } from "./KPITable";
 import { ChannelPieChart } from "./ChannelPieChart";
 import { LifecycleStagesTable } from "./LifecycleStagesTable";
+import { BusinessProfileCard } from "./BusinessProfileCard";
 import { cn } from "@/lib/utils";
 import { exportReportToWord } from "@/lib/exportToWord";
 import { useQuery } from "@tanstack/react-query";
@@ -67,6 +68,17 @@ interface ReportData {
   gaChannels?: any[];
   gaPageViews?: any;
   lifecycleStages?: LifecycleStageData;
+  googleBusinessProfile?: {
+    businessName: string;
+    address: string;
+    phone: string;
+    website: string;
+    categories: string[];
+    hours: { day: string; hours: string }[];
+    averageRating: number;
+    totalReviewCount: number;
+    mapsUri: string;
+  };
   revenueInsights?: string[];
   leadGenInsights?: string[];
   recommendations?: string[];
@@ -279,6 +291,13 @@ export function ReportView() {
           </Button>
         </div>
       </div>
+
+      {/* Google Business Profile Section */}
+      {report.googleBusinessProfile && (
+        <section className="space-y-4">
+          <BusinessProfileCard data={report.googleBusinessProfile} />
+        </section>
+      )}
 
       {/* KPI Performance Table */}
       <section className="space-y-4">
