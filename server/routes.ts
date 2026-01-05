@@ -13,7 +13,8 @@ import {
   getAllForms,
   getFormSubmissionsQuarterly,
   getAllLists,
-  getListById
+  getListById,
+  getLifecycleStageBreakdown
 } from "./hubspot-client";
 import { analyzeWithAI, generateReport, extractLearning } from "./ai-service";
 import { encrypt, decrypt } from "./encryption";
@@ -803,6 +804,17 @@ export async function registerRoutes(
         }
       }
 
+      // Fetch lifecycle stage breakdown
+      let lifecycleData: { currentCounts: Record<string, number>; quarterlyBecame: Record<string, { Q1: number; Q2: number; Q3: number; Q4: number; total: number }> } = {
+        currentCounts: {},
+        quarterlyBecame: {}
+      };
+      try {
+        lifecycleData = await getLifecycleStageBreakdown(apiKey, reportYear);
+      } catch (err) {
+        console.error("Error fetching lifecycle data for report:", err);
+      }
+
       const reportData = await generateReport(hubspotData, learnedContext, { pageViews: gaPageViews, channels: gaChannels });
       
       // Add form submissions and lists to report data
@@ -810,6 +822,7 @@ export async function registerRoutes(
       (reportData as any).hubspotLists = listsData;
       (reportData as any).gaChannels = gaChannels;
       (reportData as any).gaPageViews = gaPageViews;
+      (reportData as any).lifecycleStages = lifecycleData;
 
       const report = await storage.createReport({
         conversationId: conversationId || null,
@@ -833,6 +846,28 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching reports:", error);
       res.status(500).json({ error: "Failed to fetch reports" });
+    }
+  });
+
+  // ==========================================
+  // Lifecycle Stages
+  // ==========================================
+
+  app.get("/api/hubspot/lifecycle-stages/:accountId", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const year = parseInt(req.query.year as string) || new Date().getFullYear();
+      
+      const apiKey = await getApiKeyForAccount(accountId);
+      if (!apiKey) {
+        return res.status(400).json({ error: "HubSpot account not configured" });
+      }
+      
+      const lifecycleData = await getLifecycleStageBreakdown(apiKey, year);
+      res.json(lifecycleData);
+    } catch (error) {
+      console.error("Error fetching lifecycle stages:", error);
+      res.status(500).json({ error: "Failed to fetch lifecycle stages" });
     }
   });
 

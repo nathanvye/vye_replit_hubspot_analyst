@@ -9,6 +9,7 @@ import { Download, RefreshCw, AlertCircle, ExternalLink, FileText, Target, PieCh
 import { motion } from "framer-motion";
 import { KPITable } from "./KPITable";
 import { ChannelPieChart } from "./ChannelPieChart";
+import { LifecycleStagesTable } from "./LifecycleStagesTable";
 import { cn } from "@/lib/utils";
 import { exportReportToWord } from "@/lib/exportToWord";
 import { useQuery } from "@tanstack/react-query";
@@ -47,6 +48,11 @@ interface HubSpotListData {
   memberCount: number;
 }
 
+interface LifecycleStageData {
+  currentCounts: Record<string, number>;
+  quarterlyBecame: Record<string, { Q1: number; Q2: number; Q3: number; Q4: number; total: number }>;
+}
+
 interface ReportData {
   title: string;
   subtitle: string;
@@ -60,6 +66,7 @@ interface ReportData {
   dealsByOwner?: { owner: string; count: number; value: number }[];
   gaChannels?: any[];
   gaPageViews?: any;
+  lifecycleStages?: LifecycleStageData;
   revenueInsights?: string[];
   leadGenInsights?: string[];
   recommendations?: string[];
@@ -385,6 +392,16 @@ export function ReportView() {
               </CardContent>
             </Card>
           </div>
+        </section>
+      )}
+
+      {/* Lifecycle Stages Section */}
+      {report.lifecycleStages && Object.keys(report.lifecycleStages.quarterlyBecame || {}).length > 0 && (
+        <section className="space-y-4">
+          <LifecycleStagesTable 
+            data={report.lifecycleStages} 
+            year={report.kpiTable?.year || currentYear} 
+          />
         </section>
       )}
 

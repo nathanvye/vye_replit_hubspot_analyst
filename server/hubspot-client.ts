@@ -1011,6 +1011,109 @@ export async function getPipelineStages(
   return stageMap;
 }
 
+// Fetch contacts with lifecycle stage history (includes "became X" dates)
+export async function getContactsWithLifecycleHistory(
+  apiKey: string,
+  maxRecords = PAGINATION_CONFIG.maxRecords,
+) {
+  const client = createHubSpotClient(apiKey);
+
+  const properties = [
+    "firstname",
+    "lastname",
+    "email",
+    "lifecyclestage",
+    "createdate",
+    "hs_lifecyclestage_subscriber_date",
+    "hs_lifecyclestage_lead_date",
+    "hs_lifecyclestage_marketingqualifiedlead_date",
+    "hs_lifecyclestage_salesqualifiedlead_date",
+    "hs_lifecyclestage_opportunity_date",
+    "hs_lifecyclestage_customer_date",
+    "hs_lifecyclestage_evangelist_date",
+    "hs_lifecyclestage_other_date",
+  ];
+
+  const contacts = await fetchAllPaginated(async (after) => {
+    const response = await client.crm.contacts.basicApi.getPage(
+      PAGINATION_CONFIG.pageSize,
+      after,
+      properties,
+    );
+    return response;
+  }, maxRecords);
+
+  console.log(`Fetched ${contacts.length} contacts with lifecycle history`);
+  return contacts;
+}
+
+// Get lifecycle stage breakdown with quarterly "became X" counts
+export async function getLifecycleStageBreakdown(
+  apiKey: string,
+  year: number = new Date().getFullYear(),
+): Promise<{
+  currentCounts: Record<string, number>;
+  quarterlyBecame: Record<string, { Q1: number; Q2: number; Q3: number; Q4: number; total: number }>;
+}> {
+  const contacts = await getContactsWithLifecycleHistory(apiKey);
+
+  const lifecycleStages = [
+    { key: "subscriber", label: "Subscriber", dateField: "hs_lifecyclestage_subscriber_date" },
+    { key: "lead", label: "Lead", dateField: "hs_lifecyclestage_lead_date" },
+    { key: "marketingqualifiedlead", label: "Marketing Qualified Lead", dateField: "hs_lifecyclestage_marketingqualifiedlead_date" },
+    { key: "salesqualifiedlead", label: "Sales Qualified Lead", dateField: "hs_lifecyclestage_salesqualifiedlead_date" },
+    { key: "opportunity", label: "Opportunity", dateField: "hs_lifecyclestage_opportunity_date" },
+    { key: "customer", label: "Customer", dateField: "hs_lifecyclestage_customer_date" },
+    { key: "evangelist", label: "Evangelist", dateField: "hs_lifecyclestage_evangelist_date" },
+    { key: "other", label: "Other", dateField: "hs_lifecyclestage_other_date" },
+  ];
+
+  // Current counts by lifecycle stage
+  const currentCounts: Record<string, number> = {};
+  for (const stage of lifecycleStages) {
+    currentCounts[stage.label] = 0;
+  }
+
+  // Quarterly "became X" counts
+  const quarterlyBecame: Record<string, { Q1: number; Q2: number; Q3: number; Q4: number; total: number }> = {};
+  for (const stage of lifecycleStages) {
+    quarterlyBecame[stage.label] = { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
+  }
+
+  const getQuarter = (dateStr: string | null): "Q1" | "Q2" | "Q3" | "Q4" | null => {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    if (date.getFullYear() !== year) return null;
+    const month = date.getMonth();
+    if (month < 3) return "Q1";
+    if (month < 6) return "Q2";
+    if (month < 9) return "Q3";
+    return "Q4";
+  };
+
+  for (const contact of contacts) {
+    const currentStage = contact.properties.lifecyclestage;
+    
+    // Count current stage
+    const stageInfo = lifecycleStages.find(s => s.key === currentStage);
+    if (stageInfo) {
+      currentCounts[stageInfo.label]++;
+    }
+
+    // Count "became X" dates per quarter
+    for (const stage of lifecycleStages) {
+      const becameDate = contact.properties[stage.dateField as keyof typeof contact.properties] as string | null;
+      const quarter = getQuarter(becameDate);
+      if (quarter) {
+        quarterlyBecame[stage.label][quarter]++;
+        quarterlyBecame[stage.label].total++;
+      }
+    }
+  }
+
+  return { currentCounts, quarterlyBecame };
+}
+
 // Comprehensive data fetch for analysis (with full pagination)
 export async function getComprehensiveData(
   apiKey: string,
