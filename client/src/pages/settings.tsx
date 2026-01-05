@@ -963,9 +963,19 @@ export default function SettingsPage() {
                       {isSavingGaConfig ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Find your Property ID in Google Analytics: Admin → Property Settings → Property ID
-                  </p>
+                  <div className="p-4 bg-muted/30 rounded-lg space-y-3">
+                    <p className="text-sm font-semibold">How to set up:</p>
+                    <ol className="text-xs space-y-2 list-decimal ml-4 text-muted-foreground">
+                      <li>Log in to <a href="https://analytics.google.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">analytics.google.com</a></li>
+                      <li>Select the correct GA4 property.</li>
+                      <li>Click the ⚙️ <strong>Admin</strong> gear icon (bottom-left).</li>
+                      <li>In the Property column, click <strong>Property Access Management</strong>.</li>
+                      <li>Click <strong>+</strong> &gt; <strong>Add users</strong>.</li>
+                      <li>Paste: <code className="bg-muted px-1 py-0.5 rounded text-primary break-all">replit-hubspot-analyst@vye-reports-dashboard.iam.gserviceaccount.com</code></li>
+                      <li>Set role to <strong>Viewer</strong> and click <strong>Add</strong>.</li>
+                      <li>Go to <strong>Property Settings</strong> &gt; Copy the <strong>Property ID</strong> and paste it above.</li>
+                    </ol>
+                  </div>
                 </div>
               </CardContent>
             </Card>
