@@ -1080,9 +1080,10 @@ export async function getLifecycleStageBreakdown(
     quarterlyBecame[stage.label] = { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
   }
 
-  const getQuarter = (dateStr: string | null): "Q1" | "Q2" | "Q3" | "Q4" | null => {
-    if (!dateStr) return null;
-    const date = new Date(dateStr);
+  const getQuarter = (dateValue: string | number | null): "Q1" | "Q2" | "Q3" | "Q4" | null => {
+    if (!dateValue) return null;
+    const date = new Date(typeof dateValue === 'number' ? dateValue : dateValue);
+    if (isNaN(date.getTime())) return null;
     if (date.getFullYear() !== year) return null;
     const month = date.getMonth();
     if (month < 3) return "Q1";
@@ -1102,8 +1103,8 @@ export async function getLifecycleStageBreakdown(
 
     // Count "became X" dates per quarter
     for (const stage of lifecycleStages) {
-      const becameDate = contact.properties[stage.dateField as keyof typeof contact.properties] as string | null;
-      const quarter = getQuarter(becameDate);
+      const becameValue = contact.properties[stage.dateField as keyof typeof contact.properties];
+      const quarter = getQuarter(becameValue as string | number | null);
       if (quarter) {
         quarterlyBecame[stage.label][quarter]++;
         quarterlyBecame[stage.label].total++;
