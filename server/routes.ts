@@ -16,7 +16,7 @@ import {
   getListById,
   getLifecycleStageBreakdown
 } from "./hubspot-client";
-import { analyzeWithAI, generateReport, extractLearning } from "./ai-service";
+import { analyzeWithAI, generateReport, extractLearning, answerReportQuestion } from "./ai-service";
 import { encrypt, decrypt } from "./encryption";
 import { getPageViewsQuarterly, getChannelGroupBreakdown, isGoogleAnalyticsConfigured } from "./google-analytics-client";
 import { 
@@ -1097,8 +1097,12 @@ export async function registerRoutes(
 
   app.post("/api/reports/generate", async (req, res) => {
     try {
-      const { conversationId, hubspotAccountId, year } = req.body;
+      const { conversationId, hubspotAccountId, year, focusAreas } = req.body;
       const reportYear = year || new Date().getFullYear();
+      
+      const sanitizedFocusAreas = typeof focusAreas === 'string' && focusAreas.length <= 2000 
+        ? focusAreas.trim() 
+        : undefined;
 
       const apiKey = await getApiKeyForAccount(hubspotAccountId);
       
@@ -1233,7 +1237,7 @@ export async function registerRoutes(
         console.error("Error fetching GBP data for report:", err);
       }
 
-      const reportData = await generateReport(hubspotData, learnedContext, { pageViews: gaPageViews, channels: gaChannels });
+      const reportData = await generateReport(hubspotData, learnedContext, { pageViews: gaPageViews, channels: gaChannels }, sanitizedFocusAreas);
       
       // Add form submissions and lists to report data
       (reportData as any).formSubmissions = formSubmissionsData;
@@ -1265,6 +1269,52 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching reports:", error);
       res.status(500).json({ error: "Failed to fetch reports" });
+    }
+  });
+
+  app.post("/api/reports/ask", async (req, res) => {
+    try {
+      const { hubspotAccountId, question, reportContext, year } = req.body;
+
+      if (!question || !hubspotAccountId) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      if (typeof question !== 'string' || question.length > 2000) {
+        return res.status(400).json({ error: "Invalid question format or length" });
+      }
+
+      const apiKey = await getApiKeyForAccount(hubspotAccountId);
+      let hubspotData = null;
+      
+      if (apiKey) {
+        try {
+          hubspotData = await getComprehensiveData(apiKey, undefined, year || new Date().getFullYear());
+        } catch (err) {
+          console.error("Error fetching HubSpot data for Q&A:", err);
+        }
+      }
+
+      const sanitizedContext = reportContext ? {
+        verifiedData: reportContext.verifiedData,
+        dealsByStage: reportContext.dealsByStage,
+        dealsByOwner: reportContext.dealsByOwner,
+        revenueInsights: reportContext.revenueInsights,
+        leadGenInsights: reportContext.leadGenInsights,
+        kpiTable: reportContext.kpiTable
+      } : null;
+
+      const answer = await answerReportQuestion(
+        question.trim(),
+        sanitizedContext,
+        hubspotData,
+        year || new Date().getFullYear()
+      );
+
+      res.json({ answer });
+    } catch (error) {
+      console.error("Report Q&A error:", error);
+      res.status(500).json({ error: "Failed to answer question" });
     }
   });
 

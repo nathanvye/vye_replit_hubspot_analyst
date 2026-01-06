@@ -5,8 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, RefreshCw, AlertCircle, ExternalLink, FileText, Target, PieChart as PieChartIcon } from "lucide-react";
-import { motion } from "framer-motion";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Download, RefreshCw, AlertCircle, ExternalLink, FileText, Target, PieChart as PieChartIcon, MessageSquare, Send, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { KPITable } from "./KPITable";
 import { ChannelPieChart } from "./ChannelPieChart";
 import { LifecycleStagesTable } from "./LifecycleStagesTable";
@@ -98,6 +100,11 @@ interface ReportData {
 const currentYear = new Date().getFullYear();
 const availableYears = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3];
 
+interface QAMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export function ReportView() {
   const { selectedAccount, conversationId } = useAuth();
   const [report, setReport] = useState<ReportData | null>(null);
@@ -105,6 +112,14 @@ export function ReportView() {
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  
+  const [preGenPrompt, setPreGenPrompt] = useState("");
+  const [showPreGenPrompt, setShowPreGenPrompt] = useState(false);
+  
+  const [qaMessages, setQaMessages] = useState<QAMessage[]>([]);
+  const [qaInput, setQaInput] = useState("");
+  const [isAskingQuestion, setIsAskingQuestion] = useState(false);
+  const [lastReportContext, setLastReportContext] = useState<any>(null);
 
   const handleExportToWord = async () => {
     if (!report) return;
@@ -127,18 +142,52 @@ export function ReportView() {
 
     setIsLoading(true);
     setError(null);
+    setQaMessages([]);
 
     try {
-      const result = await api.generateReport(conversationId || "", selectedAccount, selectedYear);
+      const result = await api.generateReport(
+        conversationId || "", 
+        selectedAccount, 
+        selectedYear,
+        preGenPrompt.trim() || undefined
+      );
       if (result.reportData) {
         setReport(result.reportData);
+        setLastReportContext(result.reportContext || result.reportData);
       } else {
         setReport(result);
+        setLastReportContext(result);
       }
     } catch (err: any) {
       setError(err.message || "Failed to generate report");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleAskQuestion = async () => {
+    if (!qaInput.trim() || !selectedAccount || !lastReportContext) return;
+
+    const question = qaInput.trim();
+    setQaInput("");
+    setQaMessages(prev => [...prev, { role: "user", content: question }]);
+    setIsAskingQuestion(true);
+
+    try {
+      const response = await api.askReportQuestion(
+        selectedAccount,
+        question,
+        lastReportContext,
+        selectedYear
+      );
+      setQaMessages(prev => [...prev, { role: "assistant", content: response.answer }]);
+    } catch (err: any) {
+      setQaMessages(prev => [...prev, { 
+        role: "assistant", 
+        content: "Sorry, I couldn't process that question. Please try again." 
+      }]);
+    } finally {
+      setIsAskingQuestion(false);
     }
   };
 
@@ -211,6 +260,41 @@ export function ReportView() {
                 </SelectContent>
               </Select>
             </div>
+            
+            <div className="text-left max-w-lg mx-auto">
+              <button
+                type="button"
+                onClick={() => setShowPreGenPrompt(!showPreGenPrompt)}
+                className="flex items-center gap-2 text-sm font-medium text-[#5C3D5E] hover:text-[#5C3D5E]/80 transition-colors mb-2"
+                data-testid="button-toggle-focus-areas"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Add focus areas (optional)</span>
+                {showPreGenPrompt ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+              <AnimatePresence>
+                {showPreGenPrompt && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Textarea
+                      placeholder="Tell me what you'd like the report to focus on... (e.g., 'Look for attribution sources for closed-won deals' or 'Focus on Q4 performance trends')"
+                      value={preGenPrompt}
+                      onChange={(e) => setPreGenPrompt(e.target.value)}
+                      className="min-h-[100px] text-sm resize-none"
+                      data-testid="input-focus-areas"
+                    />
+                    <p className="text-xs text-muted-foreground mt-2">
+                      The AI will prioritize these areas while still generating comprehensive insights.
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
             {error && (
               <div className="flex items-center justify-center gap-2 text-destructive">
                 <AlertCircle className="w-4 h-4" />
@@ -246,50 +330,84 @@ export function ReportView() {
   return (
     <div className="w-full max-w-6xl mx-auto space-y-8 p-6 md:p-10 animate-in-up">
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-border pb-6">
-        <div>
-          <h1 className="text-3xl font-display font-bold text-foreground" data-testid="text-report-title">
-            {report.title}
-          </h1>
-          <p className="text-xl text-muted-foreground">{report.subtitle}</p>
+      <div className="border-b border-border pb-6 space-y-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+          <div>
+            <h1 className="text-3xl font-display font-bold text-foreground" data-testid="text-report-title">
+              {report.title}
+            </h1>
+            <p className="text-xl text-muted-foreground">{report.subtitle}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Select 
+              value={selectedYear.toString()} 
+              onValueChange={(value) => setSelectedYear(parseInt(value))}
+            >
+              <SelectTrigger className="w-[100px]" data-testid="select-year-header">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableYears.map((year) => (
+                  <SelectItem key={year} value={year.toString()}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setShowPreGenPrompt(!showPreGenPrompt)}
+              data-testid="button-toggle-focus-areas-header"
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              Focus Areas
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleGenerateReport}
+              disabled={isLoading}
+              data-testid="button-refresh-report"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+            <Button 
+              variant="default" 
+              size="sm" 
+              onClick={handleExportToWord}
+              disabled={isExporting || isLoading}
+              data-testid="button-export-word"
+            >
+              <FileText className={`w-4 h-4 mr-2 ${isExporting ? 'animate-pulse' : ''}`} />
+              {isExporting ? 'Exporting...' : 'Export to Word'}
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Select 
-            value={selectedYear.toString()} 
-            onValueChange={(value) => setSelectedYear(parseInt(value))}
-          >
-            <SelectTrigger className="w-[100px]" data-testid="select-year-header">
-              <SelectValue placeholder="Year" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableYears.map((year) => (
-                <SelectItem key={year} value={year.toString()}>
-                  {year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleGenerateReport}
-            disabled={isLoading}
-            data-testid="button-refresh-report"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <Button 
-            variant="default" 
-            size="sm" 
-            onClick={handleExportToWord}
-            disabled={isExporting || isLoading}
-            data-testid="button-export-word"
-          >
-            <FileText className={`w-4 h-4 mr-2 ${isExporting ? 'animate-pulse' : ''}`} />
-            {isExporting ? 'Exporting...' : 'Export to Word'}
-          </Button>
-        </div>
+        
+        <AnimatePresence>
+          {showPreGenPrompt && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="pt-2"
+            >
+              <Textarea
+                placeholder="Tell me what you'd like the report to focus on... (e.g., 'Look for attribution sources for closed-won deals')"
+                value={preGenPrompt}
+                onChange={(e) => setPreGenPrompt(e.target.value)}
+                className="min-h-[80px] text-sm resize-none"
+                data-testid="input-focus-areas-header"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Click Refresh to regenerate with these focus areas.
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Google Business Profile Section */}
@@ -501,6 +619,75 @@ export function ReportView() {
           </Card>
         </motion.section>
       )}
+
+      {/* Q&A Section */}
+      <motion.section 
+        className="space-y-4"
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ delay: 0.4 }}
+      >
+        <div className="flex items-center gap-2">
+          <MessageSquare className="w-5 h-5 text-[#5C3D5E]" />
+          <h2 className="text-xl font-semibold text-[#5C3D5E]">Ask Questions About This Report</h2>
+        </div>
+        <Card className="border-[#5C3D5E]/20">
+          <CardContent className="pt-6 space-y-4">
+            {qaMessages.length > 0 && (
+              <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                {qaMessages.map((msg, i) => (
+                  <div 
+                    key={i} 
+                    className={cn(
+                      "p-3 rounded-lg text-sm",
+                      msg.role === "user" 
+                        ? "bg-[#5C3D5E]/10 ml-8" 
+                        : "bg-muted mr-8"
+                    )}
+                  >
+                    <div className="font-medium text-xs text-muted-foreground mb-1">
+                      {msg.role === "user" ? "You" : "AI Assistant"}
+                    </div>
+                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                  </div>
+                ))}
+                {isAskingQuestion && (
+                  <div className="bg-muted mr-8 p-3 rounded-lg text-sm">
+                    <div className="font-medium text-xs text-muted-foreground mb-1">AI Assistant</div>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      Analyzing...
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Input
+                placeholder='Ask a question about the report... (e.g., "Identify the source and attribution model for closed-won deals")'
+                value={qaInput}
+                onChange={(e) => setQaInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleAskQuestion()}
+                disabled={isAskingQuestion}
+                className="flex-1"
+                data-testid="input-qa-question"
+              />
+              <Button
+                onClick={handleAskQuestion}
+                disabled={isAskingQuestion || !qaInput.trim()}
+                size="icon"
+                data-testid="button-ask-question"
+              >
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Ask clarifying questions about any data or insights in this report.
+            </p>
+          </CardContent>
+        </Card>
+      </motion.section>
     </div>
   );
 }

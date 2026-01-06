@@ -105,9 +105,13 @@ function formatNumber(value: number): string {
   return value.toLocaleString('en-US');
 }
 
-export async function generateReport(hubspotData: any, context: LearnedContext[], gaData?: { pageViews: any, channels: any[] }): Promise<any> {
+export async function generateReport(hubspotData: any, context: LearnedContext[], gaData?: { pageViews: any, channels: any[] }, focusAreas?: string): Promise<any> {
   const learnedContextPrompt = context.length > 0
     ? `\n\nCustom terminology:\n${context.map(lc => `- ${lc.key}: ${lc.value}`).join('\n')}`
+    : '';
+  
+  const focusAreasPrompt = focusAreas 
+    ? `\n\nUSER FOCUS AREAS (prioritize these in your analysis, but still provide comprehensive insights):\n${focusAreas}`
     : '';
 
   // Use pre-calculated summary from comprehensive data
@@ -200,7 +204,7 @@ VERIFIED DATA (use these exact numbers - do NOT invent statistics):
 - ${stageDescription || 'None'}
 - Deals by Owner: ${ownerDescription || 'None'}
 - Quarterly HubSpot Breakdown (${currentYear}): ${quarterlyDesc}
-${learnedContextPrompt}
+${learnedContextPrompt}${focusAreasPrompt}
 
 Return JSON with insights formatted like these examples:
 
@@ -313,6 +317,64 @@ CRITICAL: Every number you mention MUST include commas and come from the VERIFIE
   };
 
   return reportData;
+}
+
+// Answer questions about a generated report
+export async function answerReportQuestion(
+  question: string, 
+  reportContext: any, 
+  hubspotData: any,
+  year: number
+): Promise<string> {
+  const summary = hubspotData?.summary || reportContext?.verifiedData || {};
+  
+  const dataContext = `
+REPORT DATA FOR YEAR ${year}:
+- Total Deals: ${formatNumber(summary.totalDeals || 0)}
+- Total Deal Value: ${formatCurrency(summary.totalDealValue || 0)}
+- Closed Won Deals: ${formatNumber(summary.closedWonDeals || 0)}
+- Closed Won Value: ${formatCurrency(summary.closedWonValue || 0)}
+- Open Deals: ${formatNumber(summary.openDeals || 0)}
+- Open Pipeline Value: ${formatCurrency(summary.openDealsValue || 0)}
+- Total Contacts: ${formatNumber(summary.totalContacts || 0)}
+- Total Companies: ${formatNumber(summary.totalCompanies || 0)}
+- Page Views: ${formatNumber(summary.pageViews || 0)}
+
+${reportContext?.dealsByStage ? `DEALS BY STAGE:\n${reportContext.dealsByStage.map((s: any) => `- ${s.stage}: ${s.count} deals (${formatCurrency(s.value)})`).join('\n')}` : ''}
+
+${reportContext?.dealsByOwner ? `DEALS BY OWNER:\n${reportContext.dealsByOwner.map((o: any) => `- ${o.owner}: ${o.count} deals (${formatCurrency(o.value)})`).join('\n')}` : ''}
+
+${reportContext?.revenueInsights ? `REVENUE INSIGHTS FROM REPORT:\n${reportContext.revenueInsights.map((i: string) => `- ${i}`).join('\n')}` : ''}
+
+${reportContext?.leadGenInsights ? `LEAD GEN INSIGHTS FROM REPORT:\n${reportContext.leadGenInsights.map((i: string) => `- ${i}`).join('\n')}` : ''}
+
+${reportContext?.kpiTable ? `KPI DATA:\n${JSON.stringify(reportContext.kpiTable, null, 2)}` : ''}
+`;
+
+  const systemPrompt = `You are a helpful data analyst assistant. You have access to a generated HubSpot report and its underlying data.
+
+Your job is to answer follow-up questions about the report data clearly and accurately.
+
+CRITICAL RULES:
+- Use ONLY the data provided - never invent or estimate numbers
+- If you don't have the data to answer a question, say so clearly
+- When discussing attribution, explain what information is available and what limitations exist
+- Be specific about what data sources the numbers come from (HubSpot deals, contacts, etc.)
+- Format numbers with commas for readability
+
+${dataContext}`;
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: question }
+    ],
+    temperature: 0.3,
+    max_tokens: 1500,
+  });
+
+  return response.choices[0]?.message?.content || 'I apologize, but I was unable to answer that question.';
 }
 
 // Detect if user is teaching new context

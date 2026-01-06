@@ -118,13 +118,23 @@ export const api = {
     return res.json();
   },
 
-  async generateReport(conversationId: string, hubspotAccountId: string, year?: number): Promise<any> {
+  async generateReport(conversationId: string, hubspotAccountId: string, year?: number, focusAreas?: string): Promise<any> {
     const res = await fetch("/api/reports/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ conversationId, hubspotAccountId, year }),
+      body: JSON.stringify({ conversationId, hubspotAccountId, year, focusAreas }),
     });
     if (!res.ok) throw new Error("Failed to generate report");
+    return res.json();
+  },
+
+  async askReportQuestion(hubspotAccountId: string, question: string, reportContext: any, year: number): Promise<{ answer: string }> {
+    const res = await fetch("/api/reports/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hubspotAccountId, question, reportContext, year }),
+    });
+    if (!res.ok) throw new Error("Failed to ask question");
     return res.json();
   },
 
