@@ -178,6 +178,15 @@ export const googleBusinessProfileConfig = pgTable("google_business_profile_conf
   accessToken: text("access_token"), // Encrypted OAuth access token
   refreshToken: text("refresh_token"), // Encrypted OAuth refresh token
   tokenExpiry: timestamp("token_expiry"), // When the access token expires
+  // Manual entry fields (used when API is not available)
+  isManualEntry: text("is_manual_entry").default("false"), // "true" if data is manually entered
+  businessName: text("business_name"), // Manually entered business name
+  averageRating: text("average_rating"), // Manually entered rating (stored as text for flexibility)
+  totalReviewCount: text("total_review_count"), // Manually entered review count
+  businessAddress: text("business_address"), // Manually entered address
+  businessPhone: text("business_phone"), // Manually entered phone
+  businessWebsite: text("business_website"), // Manually entered website
+  mapsUri: text("maps_uri"), // Manually entered Google Maps link
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

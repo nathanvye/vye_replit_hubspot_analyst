@@ -124,6 +124,19 @@ export default function SettingsPage() {
   const [isLoadingGbpAccounts, setIsLoadingGbpAccounts] = useState(false);
   const [isLoadingGbpLocations, setIsLoadingGbpLocations] = useState(false);
   const [isSavingGbpLocation, setIsSavingGbpLocation] = useState(false);
+  // Manual entry state for GBP
+  const [gbpIsManualEntry, setGbpIsManualEntry] = useState(false);
+  const [gbpShowManualForm, setGbpShowManualForm] = useState(false);
+  const [gbpManualData, setGbpManualData] = useState({
+    businessName: "",
+    averageRating: "",
+    totalReviewCount: "",
+    businessAddress: "",
+    businessPhone: "",
+    businessWebsite: "",
+    mapsUri: "",
+  });
+  const [isSavingGbpManual, setIsSavingGbpManual] = useState(false);
 
   useEffect(() => {
     if (!user || !selectedAccount) {
@@ -214,7 +227,21 @@ export default function SettingsPage() {
       const response = await fetch(`/api/google-business-profile/config/${selectedAccount}`);
       if (response.ok) {
         const data = await response.json();
-        if (data && data.connected) {
+        if (data && data.isManualEntry) {
+          // Manual entry mode
+          setGbpConnected(true);
+          setGbpIsManualEntry(true);
+          setGbpLocationName(data.businessName || "Manual Entry");
+          setGbpManualData({
+            businessName: data.businessName || "",
+            averageRating: data.averageRating || "",
+            totalReviewCount: data.totalReviewCount || "",
+            businessAddress: data.businessAddress || "",
+            businessPhone: data.businessPhone || "",
+            businessWebsite: data.businessWebsite || "",
+            mapsUri: data.mapsUri || "",
+          });
+        } else if (data && data.connected) {
           setGbpConnected(true);
           setGbpLocationName(data.locationName || "Connected Location");
           setGbpHasTokens(true);
@@ -367,6 +394,17 @@ export default function SettingsPage() {
         setGbpLocations([]);
         setSelectedGbpAccount("");
         setSelectedGbpLocation("");
+        setGbpIsManualEntry(false);
+        setGbpShowManualForm(false);
+        setGbpManualData({
+          businessName: "",
+          averageRating: "",
+          totalReviewCount: "",
+          businessAddress: "",
+          businessPhone: "",
+          businessWebsite: "",
+          mapsUri: "",
+        });
         toast({
           title: "Disconnected",
           description: "Google Business Profile has been disconnected."
@@ -386,6 +424,43 @@ export default function SettingsPage() {
       });
     } finally {
       setIsDisconnectingGbp(false);
+    }
+  };
+
+  const handleSaveGbpManualEntry = async () => {
+    if (!selectedAccount) return;
+    setIsSavingGbpManual(true);
+    try {
+      const response = await fetch(`/api/google-business-profile/manual-entry/${selectedAccount}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(gbpManualData)
+      });
+
+      if (response.ok) {
+        setGbpConnected(true);
+        setGbpIsManualEntry(true);
+        setGbpLocationName(gbpManualData.businessName || "Manual Entry");
+        setGbpShowManualForm(false);
+        toast({
+          title: "Saved",
+          description: "Business profile data saved successfully."
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to save business profile data",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save business profile data. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSavingGbpManual(false);
     }
   };
 
@@ -1243,29 +1318,172 @@ export default function SettingsPage() {
                           </div>
                           <div>
                             <p className="font-medium text-green-900">{gbpLocationName}</p>
-                            <p className="text-xs text-green-700">Business profile connected</p>
+                            <p className="text-xs text-green-700">
+                              {gbpIsManualEntry ? "Manual entry" : "Business profile connected"}
+                            </p>
                           </div>
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleDisconnectGbp}
-                          disabled={isDisconnectingGbp}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          data-testid="button-disconnect-gbp"
-                        >
-                          {isDisconnectingGbp ? (
-                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                          ) : (
-                            <Unplug className="w-4 h-4 mr-2" />
+                        <div className="flex gap-2">
+                          {gbpIsManualEntry && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setGbpShowManualForm(true)}
+                              data-testid="button-edit-gbp-manual"
+                            >
+                              Edit
+                            </Button>
                           )}
-                          Disconnect
-                        </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleDisconnectGbp}
+                            disabled={isDisconnectingGbp}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            data-testid="button-disconnect-gbp"
+                          >
+                            {isDisconnectingGbp ? (
+                              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                            ) : (
+                              <Unplug className="w-4 h-4 mr-2" />
+                            )}
+                            {gbpIsManualEntry ? "Clear" : "Disconnect"}
+                          </Button>
+                        </div>
                       </div>
                     </div>
+                    {gbpIsManualEntry && gbpManualData.averageRating && (
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Rating:</span>{" "}
+                          <span className="font-medium">{gbpManualData.averageRating} stars</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Reviews:</span>{" "}
+                          <span className="font-medium">{gbpManualData.totalReviewCount}</span>
+                        </div>
+                      </div>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       Your Google Business Profile data (ratings, reviews, business info) will be included in generated reports.
                     </p>
+                  </div>
+                ) : gbpShowManualForm ? (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm font-medium text-blue-900 mb-3">Enter Business Profile Data</p>
+                      <p className="text-xs text-blue-700 mb-4">
+                        Manually enter your Google Business Profile information to include in reports.
+                      </p>
+                      <div className="space-y-3">
+                        <div>
+                          <Label className="text-xs text-blue-800 mb-1.5 block">Business Name *</Label>
+                          <Input
+                            value={gbpManualData.businessName}
+                            onChange={(e) => setGbpManualData(prev => ({ ...prev, businessName: e.target.value }))}
+                            placeholder="Your Business Name"
+                            className="bg-white"
+                            data-testid="input-gbp-business-name"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label className="text-xs text-blue-800 mb-1.5 block">Average Rating</Label>
+                            <Input
+                              value={gbpManualData.averageRating}
+                              onChange={(e) => setGbpManualData(prev => ({ ...prev, averageRating: e.target.value }))}
+                              placeholder="4.5"
+                              type="number"
+                              step="0.1"
+                              min="1"
+                              max="5"
+                              className="bg-white"
+                              data-testid="input-gbp-rating"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-blue-800 mb-1.5 block">Total Reviews</Label>
+                            <Input
+                              value={gbpManualData.totalReviewCount}
+                              onChange={(e) => setGbpManualData(prev => ({ ...prev, totalReviewCount: e.target.value }))}
+                              placeholder="150"
+                              type="number"
+                              min="0"
+                              className="bg-white"
+                              data-testid="input-gbp-reviews"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-blue-800 mb-1.5 block">Address</Label>
+                          <Input
+                            value={gbpManualData.businessAddress}
+                            onChange={(e) => setGbpManualData(prev => ({ ...prev, businessAddress: e.target.value }))}
+                            placeholder="123 Main St, City, State"
+                            className="bg-white"
+                            data-testid="input-gbp-address"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label className="text-xs text-blue-800 mb-1.5 block">Phone</Label>
+                            <Input
+                              value={gbpManualData.businessPhone}
+                              onChange={(e) => setGbpManualData(prev => ({ ...prev, businessPhone: e.target.value }))}
+                              placeholder="(555) 123-4567"
+                              className="bg-white"
+                              data-testid="input-gbp-phone"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-blue-800 mb-1.5 block">Website</Label>
+                            <Input
+                              value={gbpManualData.businessWebsite}
+                              onChange={(e) => setGbpManualData(prev => ({ ...prev, businessWebsite: e.target.value }))}
+                              placeholder="https://example.com"
+                              className="bg-white"
+                              data-testid="input-gbp-website"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-blue-800 mb-1.5 block">Google Maps Link</Label>
+                          <Input
+                            value={gbpManualData.mapsUri}
+                            onChange={(e) => setGbpManualData(prev => ({ ...prev, mapsUri: e.target.value }))}
+                            placeholder="https://maps.google.com/..."
+                            className="bg-white"
+                            data-testid="input-gbp-maps"
+                          />
+                        </div>
+                        <div className="flex gap-2 pt-2">
+                          <Button
+                            onClick={handleSaveGbpManualEntry}
+                            disabled={!gbpManualData.businessName.trim() || isSavingGbpManual}
+                            className="flex-1"
+                            data-testid="button-save-gbp-manual"
+                          >
+                            {isSavingGbpManual ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="w-4 h-4 mr-2" />
+                                Save
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => setGbpShowManualForm(false)}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 ) : gbpHasTokens ? (
                   <div className="space-y-4">
@@ -1368,6 +1586,27 @@ export default function SettingsPage() {
                             )}
                           </Button>
                         </div>
+
+                        {gbpAccounts.length === 0 && !isLoadingGbpAccounts && (
+                          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                            <p className="text-sm font-medium text-amber-900 mb-2">No accounts found?</p>
+                            <p className="text-xs text-amber-700 mb-3">
+                              Google Business Profile API may require additional approval. You can enter your business details manually instead.
+                            </p>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                handleDisconnectGbp();
+                                setGbpShowManualForm(true);
+                              }}
+                              className="w-full"
+                              data-testid="button-switch-to-manual"
+                            >
+                              Enter Data Manually
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1402,6 +1641,17 @@ export default function SettingsPage() {
                         Clicking "Connect" will redirect you to Google to authorize access. You'll be able to select which business location to connect.
                       </p>
                     </div>
+                    <div className="text-center">
+                      <span className="text-xs text-muted-foreground">or</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => setGbpShowManualForm(true)}
+                      className="w-full"
+                      data-testid="button-manual-entry-gbp"
+                    >
+                      Enter Business Details Manually
+                    </Button>
                   </div>
                 )}
               </CardContent>

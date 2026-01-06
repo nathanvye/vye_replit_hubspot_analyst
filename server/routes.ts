@@ -599,7 +599,22 @@ export async function registerRoutes(
     try {
       const { accountId } = req.params;
       const config = await storage.getGoogleBusinessProfileConfig(accountId);
-      if (config && config.accessToken) {
+      
+      if (config && config.isManualEntry === "true") {
+        // Manual entry mode
+        res.json({
+          configured: true,
+          connected: true,
+          isManualEntry: true,
+          businessName: config.businessName || null,
+          averageRating: config.averageRating || null,
+          totalReviewCount: config.totalReviewCount || null,
+          businessAddress: config.businessAddress || null,
+          businessPhone: config.businessPhone || null,
+          businessWebsite: config.businessWebsite || null,
+          mapsUri: config.mapsUri || null,
+        });
+      } else if (config && config.accessToken) {
         res.json({
           configured: true,
           connected: !!config.locationId,
@@ -607,6 +622,7 @@ export async function registerRoutes(
           locationId: config.locationId || null,
           accountId: config.accountId || null,
           hasTokens: !!config.accessToken,
+          isManualEntry: false,
         });
       } else {
         res.json({ configured: false, connected: false });
@@ -857,12 +873,59 @@ export async function registerRoutes(
     }
   });
 
+  // Manual entry for GBP data (workaround when API is not approved)
+  app.post("/api/google-business-profile/manual-entry/:accountId", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const { businessName, averageRating, totalReviewCount, businessAddress, businessPhone, businessWebsite, mapsUri } = req.body;
+      
+      await storage.upsertGoogleBusinessProfileConfig({
+        hubspotAccountId: accountId,
+        isManualEntry: "true",
+        businessName,
+        averageRating: averageRating?.toString() || null,
+        totalReviewCount: totalReviewCount?.toString() || null,
+        businessAddress,
+        businessPhone,
+        businessWebsite,
+        mapsUri,
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error saving manual GBP entry:", error);
+      res.status(500).json({ error: "Failed to save business profile data" });
+    }
+  });
+
   app.get("/api/google-business-profile/data/:accountId", async (req, res) => {
     try {
       const { accountId } = req.params;
       const config = await storage.getGoogleBusinessProfileConfig(accountId);
       
-      if (!config || !config.accessToken || !config.locationId) {
+      if (!config) {
+        return res.json({ configured: false, data: null });
+      }
+
+      // Check if this is manual entry data
+      if (config.isManualEntry === "true") {
+        return res.json({
+          configured: true,
+          isManualEntry: true,
+          data: {
+            name: config.businessName,
+            averageRating: config.averageRating ? parseFloat(config.averageRating) : null,
+            totalReviewCount: config.totalReviewCount ? parseInt(config.totalReviewCount) : null,
+            address: config.businessAddress,
+            phone: config.businessPhone,
+            website: config.businessWebsite,
+            mapsUri: config.mapsUri,
+          }
+        });
+      }
+
+      // API-based data requires tokens and location
+      if (!config.accessToken || !config.locationId) {
         return res.json({ configured: false, data: null });
       }
 
