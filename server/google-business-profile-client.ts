@@ -142,25 +142,24 @@ export async function listGBPAccounts(accessToken: string): Promise<GBPAccount[]
     const data = await response.json();
     console.log('[GBP] Raw accounts data:', JSON.stringify(data, null, 2));
     
-    // Google My Business API response for /accounts can be different depending on the account type
-    // Some return { "accounts": [...] }, some return the array directly, some return a single object
     let accountsArray: any[] = [];
     
-    if (data.accounts && Array.isArray(data.accounts)) {
+    if (data && data.accounts && Array.isArray(data.accounts)) {
       accountsArray = data.accounts;
+    } else if (data && data.account) {
+      accountsArray = Array.isArray(data.account) ? data.account : [data.account];
     } else if (Array.isArray(data)) {
       accountsArray = data;
-    } else if (data.name && (data.name.includes('accounts/') || data.type)) {
-      // It's a single account object
-      accountsArray = [data];
-    } else if (data.account) {
-      // Sometimes it's wrapped in an 'account' field
-      accountsArray = Array.isArray(data.account) ? data.account : [data.account];
+    } else if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+      if (data.name && data.name.includes('accounts/')) {
+        accountsArray = [data];
+      }
     }
     
-    // If still empty, but we have a successful 200 response, it might be an empty list
-    // or a structure we haven't seen. Let's return what we found.
-    console.log('[GBP] Accounts found:', accountsArray.length);
+    // If still empty, it might be that the user has no business accounts.
+    // However, some versions of the API return the personal account even if it's empty.
+    // If we have nothing, let's try a direct log to see if we're hitting the wrong endpoint.
+    console.log('[GBP] Final accounts array count:', accountsArray.length);
     
     return accountsArray.map((account: any) => ({
       name: account.name,
