@@ -362,6 +362,11 @@ export default function SettingsPage() {
       if (response.ok) {
         setGbpConnected(false);
         setGbpLocationName("");
+        setGbpHasTokens(false);
+        setGbpAccounts([]);
+        setGbpLocations([]);
+        setSelectedGbpAccount("");
+        setSelectedGbpLocation("");
         toast({
           title: "Disconnected",
           description: "Google Business Profile has been disconnected."
@@ -1261,6 +1266,110 @@ export default function SettingsPage() {
                     <p className="text-xs text-muted-foreground">
                       Your Google Business Profile data (ratings, reviews, business info) will be included in generated reports.
                     </p>
+                  </div>
+                ) : gbpHasTokens ? (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm font-medium text-blue-900 mb-3">Select a Business Location</p>
+                      <p className="text-xs text-blue-700 mb-4">
+                        You're connected to Google. Now select which business profile to use for reports.
+                      </p>
+                      
+                      <div className="space-y-3">
+                        <div>
+                          <Label className="text-xs text-blue-800 mb-1.5 block">Google Account</Label>
+                          <Select
+                            value={selectedGbpAccount}
+                            onValueChange={handleSelectGbpAccount}
+                            disabled={isLoadingGbpAccounts}
+                          >
+                            <SelectTrigger className="w-full bg-white" data-testid="select-gbp-account">
+                              <SelectValue placeholder={
+                                isLoadingGbpAccounts 
+                                  ? "Loading accounts..." 
+                                  : gbpAccounts.length === 0 
+                                    ? "No accounts found" 
+                                    : "Select an account"
+                              } />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {gbpAccounts.map(account => (
+                                <SelectItem key={account.name} value={account.name}>
+                                  {account.accountNumber ? `Account ${account.accountNumber}` : account.name.replace("accounts/", "Account ")}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {selectedGbpAccount && (
+                          <div>
+                            <Label className="text-xs text-blue-800 mb-1.5 block">Business Location</Label>
+                            <Select
+                              value={selectedGbpLocation}
+                              onValueChange={setSelectedGbpLocation}
+                              disabled={isLoadingGbpLocations}
+                            >
+                              <SelectTrigger className="w-full bg-white" data-testid="select-gbp-location">
+                                <SelectValue placeholder={
+                                  isLoadingGbpLocations 
+                                    ? "Loading locations..." 
+                                    : gbpLocations.length === 0 
+                                      ? "No locations found" 
+                                      : "Select a location"
+                                } />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {gbpLocations.map(location => (
+                                  <SelectItem key={location.name} value={location.name}>
+                                    <div>
+                                      <div className="font-medium">{location.title}</div>
+                                      {location.address && (
+                                        <div className="text-xs text-muted-foreground">{location.address}</div>
+                                      )}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+
+                        <div className="flex gap-2 pt-2">
+                          <Button
+                            onClick={handleSaveGbpLocation}
+                            disabled={!selectedGbpLocation || isSavingGbpLocation}
+                            className="flex-1"
+                            data-testid="button-save-gbp-location"
+                          >
+                            {isSavingGbpLocation ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="w-4 h-4 mr-2" />
+                                Save Selection
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={handleDisconnectGbp}
+                            disabled={isDisconnectingGbp}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            data-testid="button-cancel-gbp"
+                          >
+                            {isDisconnectingGbp ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              "Cancel"
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-4">
