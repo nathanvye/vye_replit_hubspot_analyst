@@ -117,7 +117,7 @@ export default function SettingsPage() {
   const [isConnectingGbp, setIsConnectingGbp] = useState(false);
   const [isDisconnectingGbp, setIsDisconnectingGbp] = useState(false);
   const [gbpHasTokens, setGbpHasTokens] = useState(false);
-  const [gbpAccounts, setGbpAccounts] = useState<{ name: string; accountNumber: string }[]>([]);
+  const [gbpAccounts, setGbpAccounts] = useState<{ name: string; accountName: string; type: string }[]>([]);
   const [gbpLocations, setGbpLocations] = useState<{ name: string; title: string; address: string }[]>([]);
   const [selectedGbpAccount, setSelectedGbpAccount] = useState<string>("");
   const [selectedGbpLocation, setSelectedGbpLocation] = useState<string>("");
@@ -1295,7 +1295,7 @@ export default function SettingsPage() {
                             <SelectContent>
                               {gbpAccounts.map(account => (
                                 <SelectItem key={account.name} value={account.name}>
-                                  {account.accountNumber ? `Account ${account.accountNumber}` : account.name.replace("accounts/", "Account ")}
+                                  {account.accountName || account.name.replace("accounts/", "Account ")}
                                 </SelectItem>
                               ))}
                             </SelectContent>

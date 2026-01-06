@@ -140,11 +140,15 @@ export async function listGBPAccounts(accessToken: string): Promise<GBPAccount[]
     }
 
     const data = await response.json();
-    console.log('[GBP] Accounts found:', data.accounts?.length || 0);
-    return (data.accounts || []).map((account: any) => ({
+    console.log('[GBP] Raw accounts data:', JSON.stringify(data, null, 2));
+    const accounts = data.accounts || data.account || [];
+    const accountsArray = Array.isArray(accounts) ? accounts : [accounts];
+    
+    console.log('[GBP] Accounts found:', accountsArray.length);
+    return accountsArray.map((account: any) => ({
       name: account.name,
-      accountName: account.accountName,
-      type: account.type,
+      accountName: account.accountName || account.name.split('/').pop() || 'Account',
+      type: account.type || 'UNKNOWN',
     }));
   } catch (error) {
     console.error('[GBP] Error listing accounts:', error);
