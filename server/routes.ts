@@ -240,7 +240,6 @@ export async function registerRoutes(
       const forms = await getAllForms(apiKey);
       res.json(forms);
     } catch (error) {
-      console.error("Error fetching available forms:", error);
       res.status(500).json({ error: "Failed to fetch available forms from HubSpot" });
     }
   });
@@ -559,7 +558,6 @@ export async function registerRoutes(
       const pageViews = await getPageViewsQuarterly(config.propertyId, parseInt(year));
       res.json({ ...pageViews, configured: true });
     } catch (error) {
-      console.error("Error fetching page views:", error);
       res.status(500).json({ error: "Failed to fetch page views" });
     }
   });
@@ -577,7 +575,6 @@ export async function registerRoutes(
       const channels = await getChannelGroupBreakdown(config.propertyId, parseInt(year));
       res.json({ channels, configured: true });
     } catch (error) {
-      console.error("Error fetching channel breakdown:", error);
       res.status(500).json({ error: "Failed to fetch channel breakdown" });
     }
   });
@@ -1174,7 +1171,6 @@ export async function registerRoutes(
           });
         } else {
           // Error response - use stored data with 0 count
-          console.warn(`Failed to fetch list details for ${list.listId}:`, listDetails.error);
           listsData.push({
             listId: list.listId,
             listName: list.listName,
@@ -1192,20 +1188,12 @@ export async function registerRoutes(
           gaPageViews = await getPageViewsQuarterly(gaConfig.propertyId, reportYear);
           gaChannels = await getChannelGroupBreakdown(gaConfig.propertyId, reportYear);
         } catch (err) {
-          console.error("Error fetching GA data for report:", err);
+          // Silent catch for GA data errors
         }
       }
 
       // Fetch lifecycle stage breakdown
-      let lifecycleData: { currentCounts: Record<string, number>; quarterlyBecame: Record<string, { Q1: number; Q2: number; Q3: number; Q4: number; total: number }> } = {
-        currentCounts: {},
-        quarterlyBecame: {}
-      };
-      try {
-        lifecycleData = await getLifecycleStageBreakdown(apiKey, reportYear);
-      } catch (err) {
-        console.error("Error fetching lifecycle data for report:", err);
-      }
+      let lifecycleData = await getLifecycleStageBreakdown(apiKey, reportYear);
 
       // Fetch Google Business Profile data if configured
       let gbpData: any = null;
@@ -1234,18 +1222,18 @@ export async function registerRoutes(
           gbpData = await getGBPBusinessInfo(accessToken, gbpConfig.locationId);
         }
       } catch (err) {
-        console.error("Error fetching GBP data for report:", err);
+        // Silent catch for GBP data errors
       }
 
       const reportData = await generateReport(hubspotData, learnedContext, { pageViews: gaPageViews, channels: gaChannels }, sanitizedFocusAreas);
       
-      // Add form submissions and lists to report data
-      (reportData as any).formSubmissions = formSubmissionsData;
-      (reportData as any).hubspotLists = listsData;
-      (reportData as any).gaChannels = gaChannels;
-      (reportData as any).gaPageViews = gaPageViews;
-      (reportData as any).lifecycleStages = lifecycleData;
-      (reportData as any).googleBusinessProfile = gbpData;
+      // Add extra data to report object
+      reportData.formSubmissions = formSubmissionsData;
+      reportData.hubspotLists = listsData;
+      reportData.gaChannels = gaChannels;
+      reportData.gaPageViews = gaPageViews;
+      reportData.lifecycleStages = lifecycleData;
+      reportData.googleBusinessProfile = gbpData;
 
       const report = await storage.createReport({
         conversationId: conversationId || null,
@@ -1291,7 +1279,7 @@ export async function registerRoutes(
         try {
           hubspotData = await getComprehensiveData(apiKey, undefined, year || new Date().getFullYear());
         } catch (err) {
-          console.error("Error fetching HubSpot data for Q&A:", err);
+          // Silent catch for HubSpot data errors in Q&A
         }
       }
 
@@ -1335,7 +1323,6 @@ export async function registerRoutes(
       const lifecycleData = await getLifecycleStageBreakdown(apiKey, year);
       res.json(lifecycleData);
     } catch (error) {
-      console.error("Error fetching lifecycle stages:", error);
       res.status(500).json({ error: "Failed to fetch lifecycle stages" });
     }
   });

@@ -67,6 +67,23 @@ interface ReportData {
   hubspotLists?: HubSpotListData[];
   dealsByStage?: { stage: string; count: number; value: number }[];
   dealsByOwner?: { owner: string; count: number; value: number }[];
+  gaChannels?: any[];
+  gaPageViews?: any;
+  lifecycleStages?: {
+    currentCounts: Record<string, number>;
+    quarterlyBecame: Record<string, { Q1: number; Q2: number; Q3: number; Q4: number; total: number }>;
+  };
+  googleBusinessProfile?: {
+    businessName: string;
+    address: string;
+    phone: string;
+    website: string;
+    categories: string[];
+    hours: { day: string; hours: string }[];
+    averageRating: number;
+    totalReviewCount: number;
+    mapsUri: string;
+  };
   revenueInsights?: string[];
   leadGenInsights?: string[];
   recommendations?: string[];
@@ -79,6 +96,7 @@ interface ReportData {
     closedWonValue: number;
     openDeals: number;
     openDealsValue: number;
+    pageViews?: number;
   };
 }
 
@@ -399,6 +417,10 @@ const createVerifiedDataTable = (verified: ReportData["verifiedData"]): Table =>
     { label: "Total Companies", value: verified.totalCompanies.toLocaleString() },
   ];
 
+  if (verified.pageViews !== undefined && verified.pageViews > 0) {
+    dataRows.push({ label: "Total Page Views", value: verified.pageViews.toLocaleString(), color: "2563EB" });
+  }
+
   const headerRow = new TableRow({
     children: [
       createHeaderCell("Metric"),
@@ -480,6 +502,54 @@ const createDealsByOwnerTable = (dealsByOwner: { owner: string; count: number; v
         createDataCell(item.owner, { bold: true, bgColor, alignment: AlignmentType.LEFT }),
         createDataCell(item.count.toLocaleString(), { bgColor }),
         createDataCell(formatCurrency(item.value), { bgColor, color: "16A34A" }),
+      ],
+    });
+  });
+
+  return new Table({
+    rows: [headerRow, ...rows],
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: {
+      top: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" },
+      bottom: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" },
+      left: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" },
+      right: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" },
+      insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" },
+      insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" },
+    },
+  });
+};
+
+const createLifecycleStagesTable = (lifecycleStages: ReportData["lifecycleStages"], year: number): Table => {
+  if (!lifecycleStages) return new Table({ rows: [] });
+
+  const headerRow = new TableRow({
+    children: [
+      createHeaderCell("Stage"),
+      createHeaderCell("Current Count"),
+      createHeaderCell("Q1 Became"),
+      createHeaderCell("Q2 Became"),
+      createHeaderCell("Q3 Became"),
+      createHeaderCell("Q4 Became"),
+      createHeaderCell("Total Became"),
+    ],
+  });
+
+  const stages = Object.keys({ ...lifecycleStages.currentCounts, ...lifecycleStages.quarterlyBecame });
+  
+  const rows = stages.map((stage, idx) => {
+    const bgColor = idx % 2 === 0 ? "FFFFFF" : "F5F5F5";
+    const quarterly = lifecycleStages.quarterlyBecame?.[stage] || { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
+    
+    return new TableRow({
+      children: [
+        createDataCell(stage, { bold: true, bgColor, alignment: AlignmentType.LEFT }),
+        createDataCell((lifecycleStages.currentCounts?.[stage] || 0).toLocaleString(), { bgColor }),
+        createDataCell(quarterly.Q1.toLocaleString(), { bgColor }),
+        createDataCell(quarterly.Q2.toLocaleString(), { bgColor }),
+        createDataCell(quarterly.Q3.toLocaleString(), { bgColor }),
+        createDataCell(quarterly.Q4.toLocaleString(), { bgColor }),
+        createDataCell(quarterly.total.toLocaleString(), { bold: true, bgColor: "F3E8FF" }),
       ],
     });
   });
@@ -596,6 +666,72 @@ export async function exportReportToWord(report: ReportData): Promise<void> {
     );
   } else if (report.verifiedData) {
     docElements.push(createVerifiedDataTable(report.verifiedData));
+  }
+
+  if (report.gaChannels && report.gaChannels.length > 0) {
+    docElements.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: "Traffic Analysis:",
+            bold: true,
+            color: PURPLE_COLOR,
+            size: 32,
+          }),
+        ],
+        spacing: { before: 400, after: 200 },
+      })
+    );
+
+    const channelRows = report.gaChannels.map((channel, idx) => {
+      const bgColor = idx % 2 === 0 ? "FFFFFF" : "F5F5F5";
+      return new TableRow({
+        children: [
+          createDataCell(channel.channel, { bold: true, bgColor, alignment: AlignmentType.LEFT }),
+          createDataCell(channel.sessions.toLocaleString(), { bgColor }),
+          createDataCell(`${channel.percentage}%`, { bgColor }),
+        ],
+      });
+    });
+
+    docElements.push(new Table({
+      rows: [
+        new TableRow({
+          children: [
+            createHeaderCell("Channel"),
+            createHeaderCell("Sessions"),
+            createHeaderCell("%"),
+          ],
+        }),
+        ...channelRows
+      ],
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      borders: {
+        top: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" },
+        bottom: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" },
+        left: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" },
+        right: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" },
+        insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" },
+        insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" },
+      },
+    }));
+  }
+
+  if (report.lifecycleStages) {
+    docElements.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: "Lifecycle Stages:",
+            bold: true,
+            color: PURPLE_COLOR,
+            size: 32,
+          }),
+        ],
+        spacing: { before: 400, after: 200 },
+      })
+    );
+    docElements.push(createLifecycleStagesTable(report.lifecycleStages, report.kpiTable?.year || new Date().getFullYear()));
   }
 
   if (report.revenueInsights && report.revenueInsights.length > 0) {
