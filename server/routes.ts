@@ -48,32 +48,6 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
-  // Auth - Login/Create User
-  app.post("/api/auth/login", async (req, res) => {
-    try {
-      const { email } = req.body;
-      
-      if (!email || !email.endsWith("@vye.agency")) {
-        return res.status(401).json({ error: "Invalid email. Must be @vye.agency" });
-      }
-
-      let user = await storage.getUserByEmail(email);
-      if (!user) {
-        const name = email.split("@")[0].split(".").map((n: string) => 
-          n.charAt(0).toUpperCase() + n.slice(1)
-        ).join(" ");
-        
-        user = await storage.createUser({ email, name });
-      }
-
-      req.session.userId = user.id;
-      res.json({ user });
-    } catch (error) {
-      console.error("Login error:", error);
-      res.status(500).json({ error: "Login failed" });
-    }
-  });
-
   // Google OAuth routes
   app.get("/api/auth/google", passport.authenticate("google", {
     scope: ["profile", "email"],

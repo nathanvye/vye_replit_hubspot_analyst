@@ -1,19 +1,14 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { Lock, Mail, ArrowRight } from "lucide-react";
+import { Lock } from "lucide-react";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const { login, checkSession, isAuthenticated } = useAuth();
+  const { checkSession, isAuthenticated } = useAuth();
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -41,28 +36,6 @@ export default function LoginPage() {
     window.location.href = "/api/auth/google";
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    const success = await login(email);
-    setIsLoading(false);
-
-    if (success) {
-      toast({
-        title: "Welcome back",
-        description: "Successfully authenticated with Vye Agency.",
-      });
-      setLocation("/select-account");
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Access Denied",
-        description: "Please sign in with a valid @vye.agency email address.",
-      });
-    }
-  };
-
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-background relative overflow-hidden">
       {/* Background Decor */}
@@ -88,7 +61,7 @@ export default function LoginPage() {
         <Card className="border-border/50 shadow-xl glass-panel">
           <CardHeader>
             <CardTitle>Sign In</CardTitle>
-            <CardDescription>Enter your agency credentials to continue</CardDescription>
+            <CardDescription>Use your agency Google account to continue</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Button
@@ -118,52 +91,10 @@ export default function LoginPage() {
               </svg>
               Sign in with Google
             </Button>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <Separator className="w-full" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">
-                  Or continue with email
-                </span>
-              </div>
-            </div>
-
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="name@vye.agency"
-                    className="pl-10"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    data-testid="input-email"
-                  />
-                </div>
-              </div>
-              <Button 
-                type="submit" 
-                className="w-full" 
-                disabled={isLoading}
-                data-testid="button-login"
-              >
-                {isLoading ? "Authenticating..." : (
-                  <span className="flex items-center gap-2">
-                    Continue <ArrowRight className="w-4 h-4" />
-                  </span>
-                )}
-              </Button>
-            </form>
           </CardContent>
           <CardFooter className="flex justify-center border-t border-border/50 pt-4 mt-2">
             <p className="text-xs text-muted-foreground text-center">
-              Restricted access. Authorized personnel only.
+              Restricted access to @vye.agency accounts only.
             </p>
           </CardFooter>
         </Card>
