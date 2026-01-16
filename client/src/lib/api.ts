@@ -38,6 +38,21 @@ export interface LearnedContext {
   value: string;
 }
 
+export interface ProoferbotEmail {
+  id: string;
+  name: string;
+  subject: string;
+  previewText: string;
+  state: string;
+  createdAt: string;
+}
+
+export interface ProoferbotAnalysisResult {
+  output: string;
+  emailCount: number;
+  failedEmails: { emailLabel: string; hubspotId: string; error: string }[];
+}
+
 export const api = {
   async login(email: string): Promise<{ user: User }> {
     const res = await fetch("/api/auth/login", {
@@ -147,6 +162,28 @@ export const api = {
   async getLearnedContext(hubspotAccountId: string): Promise<LearnedContext[]> {
     const res = await fetch(`/api/learned-context/${hubspotAccountId}`);
     if (!res.ok) throw new Error("Failed to fetch learned context");
+    return res.json();
+  },
+
+  async getProoferbotEmails(accountId: string): Promise<ProoferbotEmail[]> {
+    const res = await fetch(`/api/prooferbot/emails/${accountId}`);
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: "Failed to fetch emails" }));
+      throw new Error(error.error || "Failed to fetch marketing emails");
+    }
+    return res.json();
+  },
+
+  async analyzeEmails(accountId: string, emailIds: string[]): Promise<ProoferbotAnalysisResult> {
+    const res = await fetch("/api/prooferbot/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accountId, emailIds }),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: "Failed to analyze emails" }));
+      throw new Error(error.error || "Failed to analyze emails");
+    }
     return res.json();
   },
 };

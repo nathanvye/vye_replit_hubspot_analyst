@@ -1338,3 +1338,116 @@ export async function getComprehensiveData(
     },
   };
 }
+
+// Fetch marketing emails from HubSpot
+export async function getMarketingEmails(
+  apiKey: string,
+  limit: number = 100
+): Promise<{
+  id: string;
+  name: string;
+  subject: string;
+  previewText: string;
+  state: string;
+  createdAt: string;
+}[]> {
+  const client = createHubSpotClient(apiKey);
+  const emails: {
+    id: string;
+    name: string;
+    subject: string;
+    previewText: string;
+    state: string;
+    createdAt: string;
+  }[] = [];
+
+  try {
+    let after: string | undefined;
+    let fetched = 0;
+
+    do {
+      const httpResponse: any = await client.apiRequest({
+        method: "GET",
+        path: "/marketing/v3/emails",
+        qs: { limit: Math.min(100, limit - fetched), ...(after ? { after } : {}) },
+      });
+
+      const response = await httpResponse.json();
+      const results = response?.results || [];
+
+      for (const email of results) {
+        emails.push({
+          id: email.id,
+          name: email.name || "Unnamed Email",
+          subject: email.subject || "",
+          previewText: email.previewText || "",
+          state: email.state || "DRAFT",
+          createdAt: email.createdAt || "",
+        });
+      }
+
+      fetched += results.length;
+      after = response?.paging?.next?.after;
+    } while (after && fetched < limit);
+
+    console.log(`Fetched ${emails.length} marketing emails`);
+    emails.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  } catch (error: any) {
+    console.error(
+      "Error fetching marketing emails:",
+      error.body?.message || error.message,
+    );
+    throw error;
+  }
+
+  return emails;
+}
+
+// Fetch full details of a marketing email by ID
+export async function getMarketingEmailDetails(
+  apiKey: string,
+  emailId: string
+): Promise<{
+  id: string;
+  name: string;
+  subject: string;
+  previewText: string;
+  htmlContent: string;
+  plainTextContent: string;
+  state: string;
+  campaignName: string;
+  sendDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+}> {
+  const client = createHubSpotClient(apiKey);
+
+  try {
+    const httpResponse: any = await client.apiRequest({
+      method: "GET",
+      path: `/marketing/v3/emails/${emailId}`,
+    });
+
+    const email = await httpResponse.json();
+
+    return {
+      id: email.id,
+      name: email.name || "Unnamed Email",
+      subject: email.subject || "",
+      previewText: email.previewText || "",
+      htmlContent: email.content?.html || email.htmlBody || "",
+      plainTextContent: email.content?.plainText || email.plainTextBody || "",
+      state: email.state || "DRAFT",
+      campaignName: email.campaign?.name || email.campaignName || "",
+      sendDate: email.publishDate || email.sendDate || null,
+      createdAt: email.createdAt || "",
+      updatedAt: email.updatedAt || "",
+    };
+  } catch (error: any) {
+    console.error(
+      `Error fetching marketing email ${emailId}:`,
+      error.body?.message || error.message,
+    );
+    throw error;
+  }
+}

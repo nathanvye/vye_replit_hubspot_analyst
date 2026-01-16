@@ -14,8 +14,12 @@ import {
   getFormSubmissionsQuarterly,
   getAllLists,
   getListById,
-  getLifecycleStageBreakdown
+  getLifecycleStageBreakdown,
+  getMarketingEmails,
+  getMarketingEmailDetails
 } from "./hubspot-client";
+import { PROOFERBOT_SYSTEM_PROMPT, PROOFERBOT_MODEL_SETTINGS } from "../config/prooferbotRules";
+import OpenAI from 'openai';
 import { analyzeWithAI, generateReport, extractLearning, answerReportQuestion } from "./ai-service";
 import { encrypt, decrypt } from "./encryption";
 import { getPageViewsQuarterly, getChannelGroupBreakdown, isGoogleAnalyticsConfigured } from "./google-analytics-client";
@@ -1320,6 +1324,141 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching deals:", error);
       res.status(500).json({ error: "Failed to fetch deals" });
+    }
+  });
+
+  // ==========================================
+  // ProoferBot - Email Proofreading
+  // ==========================================
+
+  // Get marketing emails for selection
+  app.get("/api/prooferbot/emails/:accountId", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const limit = parseInt(req.query.limit as string) || 100;
+
+      const apiKey = await getApiKeyForAccount(accountId);
+      if (!apiKey) {
+        return res.status(400).json({ error: "HubSpot account not configured or API key missing" });
+      }
+
+      const emails = await getMarketingEmails(apiKey, limit);
+      res.json(emails);
+    } catch (error: any) {
+      console.error("Error fetching marketing emails:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch marketing emails" });
+    }
+  });
+
+  // Analyze selected emails
+  app.post("/api/prooferbot/analyze", async (req, res) => {
+    try {
+      const { accountId, emailIds } = req.body;
+
+      if (!accountId || !emailIds || !Array.isArray(emailIds) || emailIds.length === 0) {
+        return res.status(400).json({ error: "Missing accountId or emailIds array" });
+      }
+
+      if (emailIds.length > 20) {
+        return res.status(400).json({ error: "Maximum 20 emails can be analyzed at once" });
+      }
+
+      const apiKey = await getApiKeyForAccount(accountId);
+      if (!apiKey) {
+        return res.status(400).json({ error: "HubSpot account not configured or API key missing" });
+      }
+
+      // Fetch full details for each email
+      const emailDetails = await Promise.all(
+        emailIds.map(async (id: string, index: number) => {
+          try {
+            const details = await getMarketingEmailDetails(apiKey, id);
+            
+            // Extract links from HTML if available
+            let extractedLinks: { text: string; url: string }[] = [];
+            if (details.htmlContent) {
+              const linkRegex = /<a[^>]+href=["']([^"']+)["'][^>]*>([^<]*)<\/a>/gi;
+              let match;
+              while ((match = linkRegex.exec(details.htmlContent)) !== null) {
+                extractedLinks.push({
+                  url: match[1],
+                  text: match[2].trim() || "[No text]"
+                });
+              }
+            }
+
+            // Truncate HTML if extremely large (>50KB)
+            let html = details.htmlContent;
+            let htmlTruncated = false;
+            if (html.length > 50000) {
+              html = html.substring(0, 50000);
+              htmlTruncated = true;
+            }
+
+            return {
+              emailLabel: String.fromCharCode(65 + index), // A, B, C...
+              hubspotId: details.id,
+              name: details.name,
+              subject: details.subject,
+              previewText: details.previewText,
+              html: html || null,
+              plainText: details.plainTextContent || null,
+              extractedLinks: extractedLinks.slice(0, 50), // Limit links
+              metadata: {
+                campaignName: details.campaignName || null,
+                sendDate: details.sendDate || null,
+                state: details.state,
+                htmlTruncated
+              }
+            };
+          } catch (err: any) {
+            return {
+              emailLabel: String.fromCharCode(65 + index),
+              hubspotId: id,
+              error: `Failed to fetch email: ${err.message}`
+            };
+          }
+        })
+      );
+
+      // Check if all emails failed
+      const successfulEmails = emailDetails.filter(e => !('error' in e));
+      if (successfulEmails.length === 0) {
+        return res.status(400).json({ error: "Failed to fetch any email details" });
+      }
+
+      // Build user message for OpenAI
+      const userMessage = JSON.stringify({
+        emailCount: successfulEmails.length,
+        emails: emailDetails
+      }, null, 2);
+
+      // Call OpenAI
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const completion = await openai.chat.completions.create({
+        model: PROOFERBOT_MODEL_SETTINGS.model,
+        temperature: PROOFERBOT_MODEL_SETTINGS.temperature,
+        max_tokens: PROOFERBOT_MODEL_SETTINGS.maxTokens,
+        messages: [
+          { role: "system", content: PROOFERBOT_SYSTEM_PROMPT },
+          { role: "user", content: userMessage }
+        ]
+      });
+
+      const output = completion.choices[0]?.message?.content || "";
+
+      res.json({ 
+        output,
+        emailCount: successfulEmails.length,
+        failedEmails: emailDetails.filter(e => 'error' in e)
+      });
+    } catch (error: any) {
+      console.error("ProoferBot analyze error:", error);
+      res.status(500).json({ error: error.message || "Failed to analyze emails" });
     }
   });
 

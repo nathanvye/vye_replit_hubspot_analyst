@@ -59,6 +59,22 @@ Preferred communication style: Simple, everyday language.
 - Supports learned context - users can teach the AI custom terminology
 - Conversation history maintained for context continuity
 
+### ProoferBot Feature
+- **Location**: `/prooferbot` route (accessible from dashboard sidebar)
+- **Purpose**: QA proofreading tool for HubSpot marketing emails
+- **Config**: `config/prooferbotRules.ts` - contains system prompt and model settings
+- **API Routes**:
+  - `GET /api/prooferbot/emails/:accountId` - List marketing emails
+  - `POST /api/prooferbot/analyze` - Analyze selected emails with OpenAI
+- **Features**:
+  - Email list with search/filter, multi-select, select all/clear
+  - Selected emails panel with remove capability
+  - Analysis results viewer with monospace table formatting
+  - Strict output validation (tables only, no paragraphs)
+  - Debug mode for format violations
+  - Copy output button
+- **Required HubSpot Scope**: `marketing-email` for fetching marketing emails
+
 ### Build System
 - Development: Vite dev server with HMR on port 5000
 - Production: Custom build script using esbuild for server, Vite for client

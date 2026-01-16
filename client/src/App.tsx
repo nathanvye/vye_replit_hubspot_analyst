@@ -9,6 +9,7 @@ import LoginPage from "@/pages/login";
 import AccountSelectPage from "@/pages/account-select.tsx";
 import DashboardPage from "@/pages/dashboard";
 import SettingsPage from "@/pages/settings";
+import ProoferbotPage from "@/pages/prooferbot";
 
 function Router() {
   return (
@@ -17,6 +18,7 @@ function Router() {
       <Route path="/select-account" component={AccountSelectPage} />
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/settings" component={SettingsPage} />
+      <Route path="/prooferbot" component={ProoferbotPage} />
       <Route component={NotFound} />
     </Switch>
   );
