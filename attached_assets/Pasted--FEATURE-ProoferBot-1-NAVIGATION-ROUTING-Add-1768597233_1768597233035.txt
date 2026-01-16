@@ -1,0 +1,189 @@
+========================
+FEATURE: ProoferBot
+========================
+
+1) NAVIGATION / ROUTING
+- Add a third navigation item labeled: ProoferBot
+- Route to: /prooferbot
+- Follow the app’s existing patterns for navigation + routing
+- Ensure the new page is only available to authenticated users (assume existing auth middleware/layout already does this)
+
+2) HUBSPOT EMAIL FETCHING (LIST VIEW)
+- On /prooferbot page load, call the backend to fetch HubSpot marketing emails.
+- We already have HubSpot connectivity in the backend; use the existing HubSpot client/util/service in the codebase.
+- Return a list of emails with at minimum:
+  - id (HubSpot internal id)
+  - name (or campaign/email name)
+  - subject line
+  - preview text (if available)
+- Show loading + error states.
+
+Backend requirements:
+- Create an API route, e.g. GET /api/prooferbot/emails
+- It should call HubSpot and return marketing emails in a normalized shape.
+- If the existing code already has similar routes/services, reuse them; do NOT duplicate.
+
+3) EMAIL SELECTION UI
+Create an easy-to-use GUI:
+- Main list: table or list with checkboxes allowing multi-select.
+- Each row shows: checkbox, name, subject line (and optionally preview text in smaller text).
+- Add search/filter input (simple client-side filter by name/subject).
+- Add “Select all” (for current filtered results) and “Clear selection”.
+
+Selected Emails panel:
+- Show a separate list/table of selected emails below or side-by-side.
+- Each selected item can be removed.
+- The panel clearly shows how many are selected.
+
+4) FULL EMAIL DETAILS FETCH (FOR ANALYSIS)
+When the user clicks Analyze:
+- For each selected email, fetch full details needed for analysis:
+  - subject line
+  - preview text
+  - headings (if available)
+  - body copy (HTML + text if possible)
+  - CTA buttons/links (verify link URLs exist when possible)
+  - footer
+  - any campaign metadata available from HubSpot endpoints
+- If HubSpot provides HTML only, pass HTML; do not attempt a full HTML-to-image conversion.
+- If some fields cannot be fetched, include what’s available and note missing fields in metadata.
+
+Backend requirements:
+- Create an API route, e.g. POST /api/prooferbot/analyze
+- Payload: { emailIds: string[] }
+- Server will fetch details from HubSpot for those IDs, then send to OpenAI.
+- Return the raw OpenAI output text (do not transform it).
+- Add robust error handling and return meaningful errors.
+
+5) RULES CONFIG (EDITABLE)
+Create a dedicated rules configuration module that can be edited later without touching core logic:
+- Example location: /config/prooferbotRules.ts
+- Export:
+  - systemPrompt (string) EXACTLY as provided below (no paraphrasing)
+  - model settings (model name, temperature, max tokens) as constants
+The analyze route must import and use this config.
+
+6) OPENAI SYSTEM PROMPT (MUST BE VERBATIM)
+Use the following system instructions EXACTLY (copy/paste, no changes):
+
+You are a meticulous QA proofreader reviewing screenshots of a batch of HubSpot marketing emails. Your goal is to catch errors, inconsistencies, and clone mistakes across the set.
+Input: the chosen emails
+What to do:
+Read every email carefully (subject line, preview text, headings, body copy, CTAs, footer, and any campaign metadata visible). verify all buttons have links.
+
+Compare emails against each other to ensure consistency across the batch.
+
+Output MUST be concise and scannable.
+
+Output format (STRICT — tables only, no paragraphs):
+Subject line + preview text table (one table for all emails):
+ | Email | Subject line | Preview text | Casing consistent? (Y/N) | Unique? (Y/N) | Notes |
+
+
+Then, for EACH email, output ONE fix table only:
+ Email A — Fix table
+ | Severity (High/Med/Low) | Type | Location | Exact text flagged | Suggested fix |
+
+
+Email B — Fix table
+ | Severity (High/Med/Low) | Type | Location | Exact text flagged | Suggested fix |
+Email C — Fix table
+ | Severity (High/Med/Low) | Type | Location | Exact text flagged | Suggested fix |
+Cross-email consistency issues table:
+ | Category | What’s inconsistent | Suggested fix |
+
+
+Rules:
+Flag ONLY true issues: typos, grammar errors, missing words, duplicated words, incorrect punctuation, inconsistent date/time formatting, incorrect/missing links or labels (text only), duplicated content that looks accidental, campaign mismatches, obvious formatting/misalignment, abrupt design/color transitions, missing elements that should be present, and clear clone leftovers (wrong title/date/time/location/offer/product name).
+
+
+Formatting/Layout errors to flag include: uneven spacing between modules, inconsistent padding around headers/images/buttons, misaligned columns, off-center buttons, inconsistent alignment (left/center), inconsistent divider thickness/style, broken line breaks or awkward wraps, inconsistent link/button styling (size/weight/underline), and missing/extra modules compared to the rest of the batch.
+
+
+Be extremely specific: always quote the exact text being flagged in the “Exact text flagged” cell.
+
+
+“Notes” must be short (1 sentence max).
+Blocks of text that exceed 6 lines (indiciating copy might need shortening for skimmability)
+No commentary outside tables.
+
+
+If something can’t be verified due to resolution/cropping, add a row with:
+ Severity = Low
+ Type = Cannot verify
+ Location = (where it is)
+ Exact text flagged = (what you can partially see)
+ Suggested fix = (what screenshot is needed)
+
+
+DO NOT FLAG the following (not issues):
+Parentheses in subject lines, preview text, or body copy (expected to come and go).
+
+
+CTA text variation across emails (CTAs will vary).
+
+
+ALL CAPS in subject lines or preview text (intentional).
+
+
+Short sentences / sentence fragments used for emphasis (not a grammar error).
+
+7) AI REQUEST SHAPE
+- In the analyze endpoint, call OpenAI using:
+  - system prompt = the rules above from config
+  - user message = a structured payload of the selected emails
+- The user message should be JSON (stringified) including an array of emails with:
+  - emailLabel (A, B, C…)
+  - hubspotId
+  - name
+  - subject
+  - previewText
+  - html (if available)
+  - plainText (if available)
+  - extractedLinks (array of { text, url } if you can parse)
+  - metadata (campaignName, sendDate, etc. if available)
+- Keep the user message concise but complete; do not include huge unnecessary blobs if HubSpot returns excessive content.
+- If HTML is extremely large, include the most relevant sections and a note in metadata that it was truncated.
+
+8) STRICT OUTPUT HANDLING (FRONTEND)
+- Render the OpenAI response exactly as returned.
+- Do NOT summarize, rewrite, or add any commentary.
+- Preserve tables. Display using a monospace block or Markdown renderer that preserves table formatting.
+- Add a “Copy output” button.
+
+9) VALIDATION / FAIL-LOUDLY
+- After receiving OpenAI output, validate that it contains ONLY tables (pipes |) and no normal paragraphs.
+- If it violates format, show a clear error and display the raw output in a collapsible “debug” section.
+
+10) NON-GOALS (DO NOT BUILD)
+- No email editing in HubSpot
+- No saving reports to DB
+- No export to PDF
+- No role/permission changes
+- No new auth logic
+- No design polish beyond basic usability
+
+========================
+DELIVERABLES
+========================
+- New nav item: ProoferBot
+- New page: /prooferbot
+- API routes:
+  - GET /api/prooferbot/emails (list)
+  - POST /api/prooferbot/analyze (analyze selected)
+- Config file: /config/prooferbotRules.ts (or equivalent)
+- Components:
+  - EmailList with filtering + multi-select
+  - SelectedEmails panel
+  - Analyze button + results viewer (table output)
+- Reuse existing HubSpot + OpenAI integrations and environment variables already present.
+
+========================
+BUILD PRIORITY
+========================
+1. Correctness
+2. Strict output enforcement (tables only)
+3. Speed of build
+4. Simplicity
+
+Do not ask follow-up questions. Make reasonable assumptions based on existing code patterns and implement end-to-end.
