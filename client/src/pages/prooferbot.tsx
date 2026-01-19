@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { 
   ArrowLeft,
   Search,
@@ -424,17 +426,15 @@ export default function ProoferbotPage() {
                   {copied ? <Check className="w-4 h-4 mr-1" /> : <Copy className="w-4 h-4 mr-1" />}
                   {copied ? 'Copied' : 'Copy'}
                 </Button>
-                {!isValidFormat && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setShowDebug(!showDebug)}
-                    data-testid="button-toggle-debug"
-                  >
-                    {showDebug ? <ChevronUp className="w-4 h-4 mr-1" /> : <ChevronDown className="w-4 h-4 mr-1" />}
-                    Debug
-                  </Button>
-                )}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setShowDebug(!showDebug)}
+                  data-testid="button-toggle-debug"
+                >
+                  {showDebug ? <ChevronUp className="w-4 h-4 mr-1" /> : <ChevronDown className="w-4 h-4 mr-1" />}
+                  Raw
+                </Button>
               </div>
             </div>
 
@@ -448,9 +448,50 @@ export default function ProoferbotPage() {
 
             <ScrollArea className="max-h-[50vh]">
               <div className="p-4">
-                <pre className="font-mono text-sm whitespace-pre-wrap bg-muted/50 p-4 rounded-lg border border-border overflow-x-auto" data-testid="text-analysis-output">
-                  {result.output}
-                </pre>
+                <div className="prose prose-sm max-w-none dark:prose-invert overflow-x-auto" data-testid="text-analysis-output">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      table: ({ children }) => (
+                        <table className="w-full border-collapse border border-border text-sm my-4">
+                          {children}
+                        </table>
+                      ),
+                      thead: ({ children }) => (
+                        <thead className="bg-muted/70">{children}</thead>
+                      ),
+                      th: ({ children }) => (
+                        <th className="border border-border px-3 py-2 text-left font-semibold whitespace-nowrap">
+                          {children}
+                        </th>
+                      ),
+                      td: ({ children }) => (
+                        <td className="border border-border px-3 py-2 align-top">
+                          {children}
+                        </td>
+                      ),
+                      tr: ({ children }) => (
+                        <tr className="hover:bg-muted/30">{children}</tr>
+                      ),
+                      p: ({ children }) => (
+                        <p className="my-2 font-semibold text-foreground">{children}</p>
+                      ),
+                    }}
+                  >
+                    {result.output}
+                  </ReactMarkdown>
+                </div>
+
+                {showDebug && (
+                  <details className="mt-4">
+                    <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+                      View Raw Output
+                    </summary>
+                    <pre className="font-mono text-xs whitespace-pre-wrap bg-muted/50 p-4 rounded-lg border border-border overflow-x-auto mt-2">
+                      {result.output}
+                    </pre>
+                  </details>
+                )}
 
                 {result.failedEmails && result.failedEmails.length > 0 && (
                   <div className="mt-4 p-3 bg-destructive/10 rounded-lg">
