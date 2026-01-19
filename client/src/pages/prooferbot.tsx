@@ -321,7 +321,7 @@ export default function ProoferbotPage() {
                   {filteredEmails.map(email => (
                     <div 
                       key={email.id}
-                      className={`p-4 hover:bg-muted/50 cursor-pointer transition-colors ${selectedIds.has(email.id) ? 'bg-primary/5' : ''}`}
+                      className={`p-4 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border ${selectedIds.has(email.id) ? 'bg-primary/5' : ''}`}
                       onClick={() => toggleSelect(email.id)}
                       data-testid={`email-row-${email.id}`}
                     >
@@ -340,8 +340,12 @@ export default function ProoferbotPage() {
                                   href={email.webversionUrl} 
                                   target="_blank" 
                                   rel="noopener noreferrer"
-                                  className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded hover:bg-primary/20 transition-colors flex items-center gap-0.5 shrink-0"
-                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded hover:bg-primary/20 transition-colors flex items-center gap-0.5 shrink-0 z-20 relative"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    console.log("View link clicked for:", email.id);
+                                  }}
+                                  data-testid={`link-view-${email.id}`}
                                 >
                                   <ExternalLink className="w-2.5 h-2.5" />
                                   VIEW

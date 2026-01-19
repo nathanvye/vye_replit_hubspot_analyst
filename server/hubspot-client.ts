@@ -1431,9 +1431,12 @@ export async function getMarketingEmailDetails(
 
     const email = await httpResponse.json();
     
-    // Log the structure to help debug
-    console.log(`[HubSpot Email ${emailId}] API Response keys:`, Object.keys(email));
+    // Log the keys to see what's available
+    console.log(`[HubSpot Email ${emailId}] API Keys:`, Object.keys(email));
 
+    // Try to get HTML content from preview endpoint as a fallback if webversion fetch fails
+    // This is handled in routes.ts now per user request for /preview endpoint
+    
     return {
       id: email.id,
       name: email.name || "Unnamed Email",

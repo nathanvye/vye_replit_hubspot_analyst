@@ -1376,23 +1376,46 @@ export async function registerRoutes(
             
             let html = details.htmlContent;
             
-            // Primary source of truth: Web version URL
-            if (details.webversionUrl) {
-              try {
-                console.log(`[ProoferBot] Fetching webversion for email ${id}: ${details.webversionUrl}`);
-                const response = await fetch(details.webversionUrl, { 
-                  timeout: 5000,
-                  headers: { 'User-Agent': 'ProoferBot/1.0' }
-                } as any);
-                if (response.ok) {
-                  html = await response.text();
-                  console.log(`[ProoferBot] Successfully fetched webversion HTML (${html.length} bytes)`);
-                } else {
-                  console.warn(`[ProoferBot] Webversion fetch failed with status ${response.status}`);
+            // Try Preview endpoint FIRST as requested (more reliable for Drafts/Unpublished)
+            try {
+              console.log(`[ProoferBot] Fetching preview for email ${id}...`);
+              const previewResponse = await fetch(`https://api.hubapi.com/marketing/v3/emails/${id}/preview`, {
+                method: 'POST',
+                headers: { 
+                  'Authorization': `Bearer ${apiKey}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({}) // Default preview
+              } as any);
+
+              if (previewResponse.ok) {
+                const previewData = await previewResponse.json() as any;
+                if (previewData.html) {
+                  html = previewData.html;
+                  console.log(`[ProoferBot] Successfully fetched Preview HTML (${html.length} bytes)`);
                 }
-              } catch (fetchErr) {
-                console.warn(`[ProoferBot] Error fetching webversion for ${id}:`, fetchErr);
+              } else {
+                console.warn(`[ProoferBot] Preview fetch failed with status ${previewResponse.status}`);
+                
+                // Fallback to Web version URL if preview fails
+                if (details.webversionUrl) {
+                  try {
+                    console.log(`[ProoferBot] Falling back to webversion for email ${id}: ${details.webversionUrl}`);
+                    const response = await fetch(details.webversionUrl, { 
+                      timeout: 5000,
+                      headers: { 'User-Agent': 'ProoferBot/1.0' }
+                    } as any);
+                    if (response.ok) {
+                      html = await response.text();
+                      console.log(`[ProoferBot] Successfully fetched webversion HTML (${html.length} bytes)`);
+                    }
+                  } catch (fetchErr) {
+                    console.warn(`[ProoferBot] Error fetching webversion fallback for ${id}:`, fetchErr);
+                  }
+                }
               }
+            } catch (err) {
+              console.error(`[ProoferBot] Critical error during content fetch for ${id}:`, err);
             }
 
             // Extract links from the fetched HTML
