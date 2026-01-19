@@ -1375,47 +1375,56 @@ export async function registerRoutes(
             const details = await getMarketingEmailDetails(apiKey, id);
             
             let html = details.htmlContent;
+            let contentSource = 'api_extracted';
             
-            // Try Preview endpoint FIRST as requested (more reliable for Drafts/Unpublished)
-            try {
-              console.log(`[ProoferBot] Fetching preview for email ${id}...`);
-              const previewResponse = await fetch(`https://api.hubapi.com/marketing/v3/emails/${id}/preview`, {
-                method: 'POST',
-                headers: { 
-                  'Authorization': `Bearer ${apiKey}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({}) // Default preview
-              } as any);
+            // If extracted HTML is empty or very short, try the Preview endpoint
+            if (!html || html.length < 100) {
+              try {
+                console.log(`[ProoferBot] Fetching preview for email ${id} (extracted HTML was ${html?.length || 0} bytes)...`);
+                const previewResponse = await fetch(`https://api.hubapi.com/marketing/v3/emails/${id}/preview`, {
+                  method: 'POST',
+                  headers: { 
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({})
+                } as any);
 
-              if (previewResponse.ok) {
-                const previewData = await previewResponse.json() as any;
-                if (previewData.html) {
-                  html = previewData.html;
-                  console.log(`[ProoferBot] Successfully fetched Preview HTML (${html.length} bytes)`);
+                if (previewResponse.ok) {
+                  const previewData = await previewResponse.json() as any;
+                  if (previewData.html && previewData.html.length > (html?.length || 0)) {
+                    html = previewData.html;
+                    contentSource = 'preview_endpoint';
+                    console.log(`[ProoferBot] Successfully fetched Preview HTML (${html.length} bytes)`);
+                  }
+                } else {
+                  console.warn(`[ProoferBot] Preview fetch failed with status ${previewResponse.status}`);
                 }
-              } else {
-                console.warn(`[ProoferBot] Preview fetch failed with status ${previewResponse.status}`);
-                
-                // Fallback to Web version URL if preview fails
-                if (details.webversionUrl) {
-                  try {
-                    console.log(`[ProoferBot] Falling back to webversion for email ${id}: ${details.webversionUrl}`);
-                    const response = await fetch(details.webversionUrl, { 
-                      timeout: 5000,
-                      headers: { 'User-Agent': 'ProoferBot/1.0' }
-                    } as any);
-                    if (response.ok) {
-                      html = await response.text();
-                      console.log(`[ProoferBot] Successfully fetched webversion HTML (${html.length} bytes)`);
-                    }
-                  } catch (fetchErr) {
-                    console.warn(`[ProoferBot] Error fetching webversion fallback for ${id}:`, fetchErr);
+              } catch (err) {
+                console.warn(`[ProoferBot] Preview endpoint error for ${id}:`, err);
+              }
+            } else {
+              console.log(`[ProoferBot] Using extracted HTML for email ${id} (${html.length} bytes)`);
+            }
+            
+            // Final fallback: Web version URL
+            if ((!html || html.length < 100) && details.webversionUrl) {
+              try {
+                console.log(`[ProoferBot] Falling back to webversion for email ${id}: ${details.webversionUrl}`);
+                const response = await fetch(details.webversionUrl, { 
+                  headers: { 'User-Agent': 'ProoferBot/1.0' }
+                } as any);
+                if (response.ok) {
+                  const webHtml = await response.text();
+                  if (webHtml.length > (html?.length || 0)) {
+                    html = webHtml;
+                    contentSource = 'webversion';
+                    console.log(`[ProoferBot] Successfully fetched webversion HTML (${html.length} bytes)`);
                   }
                 }
+              } catch (fetchErr) {
+                console.warn(`[ProoferBot] Error fetching webversion for ${id}:`, fetchErr);
               }
-            } catch (err) {
-              console.error(`[ProoferBot] Critical error during content fetch for ${id}:`, err);
             }
 
             // Extract links from the fetched HTML
@@ -1459,7 +1468,7 @@ export async function registerRoutes(
                 sendDate: details.sendDate || null,
                 state: details.state,
                 htmlTruncated,
-                source: details.webversionUrl ? 'webversion' : 'api'
+                source: contentSource
               }
             };
           } catch (err: any) {

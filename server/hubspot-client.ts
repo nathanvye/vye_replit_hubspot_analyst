@@ -1350,6 +1350,7 @@ export async function getMarketingEmails(
   previewText: string;
   state: string;
   createdAt: string;
+  webversionUrl?: string | null;
 }[]> {
   const client = createHubSpotClient(apiKey);
   const emails: {
@@ -1359,6 +1360,7 @@ export async function getMarketingEmails(
     previewText: string;
     state: string;
     createdAt: string;
+    webversionUrl?: string | null;
   }[] = [];
 
   try {
@@ -1383,6 +1385,7 @@ export async function getMarketingEmails(
           previewText: email.previewText || "",
           state: email.state || "DRAFT",
           createdAt: email.createdAt || "",
+          webversionUrl: email.publishedUrl || email.url || email.webversion?.url || null,
         });
       }
 
@@ -1401,6 +1404,130 @@ export async function getMarketingEmails(
   }
 
   return emails;
+}
+
+/**
+ * Extract HTML body from a HubSpot marketing email API response.
+ * Handles both direct HTML emails and drag-and-drop widget-based emails.
+ */
+function extractEmailHtmlBody(email: any): string {
+  const content = email.content;
+  
+  if (!content) {
+    return "";
+  }
+
+  // 1. Prefer direct HTML if present (normal emails)
+  if (content.html && typeof content.html === 'string' && content.html.trim()) {
+    return content.html;
+  }
+  
+  // Fallback to plaintext wrapped in <pre> if available
+  if (content.plaintext && typeof content.plaintext === 'string' && content.plaintext.trim()) {
+    return `<pre>${content.plaintext}</pre>`;
+  }
+
+  // 2. Reconstruct HTML from drag-and-drop / system modules
+  const flexAreas = content.flexAreas;
+  const widgetsById = content.widgets || {};
+  
+  if (!flexAreas?.main?.sections || !Array.isArray(flexAreas.main.sections)) {
+    // No flex areas, nothing to reconstruct
+    return "";
+  }
+
+  const htmlBlocks: string[] = [];
+
+  // Walk the layout tree IN ORDER
+  for (const section of flexAreas.main.sections) {
+    if (!section.columns || !Array.isArray(section.columns)) continue;
+    
+    for (const column of section.columns) {
+      if (!column.widgets || !Array.isArray(column.widgets)) continue;
+      
+      for (const widgetRef of column.widgets) {
+        const widgetId = widgetRef.id || widgetRef;
+        const widget = widgetsById[widgetId];
+        
+        if (!widget) continue;
+
+        // Extract HTML from widget using the defined rules
+        const widgetHtml = extractWidgetHtml(widget);
+        if (widgetHtml) {
+          htmlBlocks.push(widgetHtml);
+        }
+      }
+    }
+  }
+
+  if (htmlBlocks.length === 0) {
+    return "";
+  }
+
+  // Wrap in basic HTML document
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+${htmlBlocks.join('\n')}
+</body>
+</html>`;
+}
+
+/**
+ * Extract HTML from a single widget based on its type and properties.
+ */
+function extractWidgetHtml(widget: any): string | null {
+  // Rule 1: widget.body.html exists
+  if (widget.body?.html) {
+    return widget.body.html;
+  }
+
+  // Rule 2: widget.richText.html exists  
+  if (widget.richText?.html) {
+    return widget.richText.html;
+  }
+
+  // Rule 3: widget.text exists
+  if (widget.text && typeof widget.text === 'string') {
+    return `<p>${widget.text}</p>`;
+  }
+
+  // Rule 4: Image widget
+  if (widget.type === 'image' && widget.src) {
+    const alt = widget.alt || '';
+    return `<img src="${widget.src}" alt="${alt}" />`;
+  }
+
+  // Rule 5: CTA widget
+  if (widget.type === 'cta' && widget.link) {
+    const text = widget.text || 'View';
+    return `<a href="${widget.link}">${text}</a>`;
+  }
+
+  // Also check for common widget structures
+  if (widget.params?.html) {
+    return widget.params.html;
+  }
+  
+  if (widget.params?.text) {
+    return `<p>${widget.params.text}</p>`;
+  }
+
+  // Check for button widgets
+  if (widget.type === 'button' || widget.type === 'linked_image') {
+    const href = widget.params?.href || widget.link || widget.url || '#';
+    const text = widget.params?.text || widget.text || widget.alt || 'Click here';
+    const src = widget.params?.src || widget.src;
+    
+    if (src) {
+      return `<a href="${href}"><img src="${src}" alt="${text}" /></a>`;
+    }
+    return `<a href="${href}">${text}</a>`;
+  }
+
+  // Ignore widget if no HTML can be extracted
+  return null;
 }
 
 // Fetch full details of a marketing email by ID
@@ -1433,17 +1560,20 @@ export async function getMarketingEmailDetails(
     
     // Log the keys to see what's available
     console.log(`[HubSpot Email ${emailId}] API Keys:`, Object.keys(email));
+    if (email.content) {
+      console.log(`[HubSpot Email ${emailId}] Content keys:`, Object.keys(email.content));
+    }
 
-    // Try to get HTML content from preview endpoint as a fallback if webversion fetch fails
-    // This is handled in routes.ts now per user request for /preview endpoint
+    // Extract HTML using the comprehensive algorithm
+    const extractedHtml = extractEmailHtmlBody(email);
     
     return {
       id: email.id,
       name: email.name || "Unnamed Email",
       subject: email.subject || "",
       previewText: email.previewText || email.content?.previewText || "",
-      htmlContent: email.content?.html || email.htmlBody || email.body || "",
-      plainTextContent: email.content?.plainText || email.plainTextBody || "",
+      htmlContent: extractedHtml,
+      plainTextContent: email.content?.plainText || email.content?.plaintext || "",
       webversionUrl: email.publishedUrl || email.url || email.absoluteUrl || null,
       state: email.state || "DRAFT",
       campaignName: email.campaign?.name || email.campaignName || email.campaign?.label || "",
