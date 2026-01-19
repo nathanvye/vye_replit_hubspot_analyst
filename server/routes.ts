@@ -1430,6 +1430,7 @@ export async function registerRoutes(
               html: html || null,
               plainText: details.plainTextContent || null,
               extractedLinks: extractedLinks.slice(0, 50), // Limit links
+              webversionUrl: details.webversionUrl, // Pass URL to frontend
               metadata: {
                 campaignName: details.campaignName || null,
                 sendDate: details.sendDate || null,

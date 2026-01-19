@@ -45,6 +45,7 @@ export interface ProoferbotEmail {
   previewText: string;
   state: string;
   createdAt: string;
+  webversionUrl?: string | null;
 }
 
 export interface ProoferbotAnalysisResult {

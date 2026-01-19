@@ -22,6 +22,7 @@ import {
   Check,
   AlertTriangle,
   X,
+  ExternalLink,
   BrainCircuit,
   Database,
   LogOut,
@@ -332,7 +333,21 @@ export default function ProoferbotPage() {
                         />
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-sm truncate">{email.name}</p>
-                          <p className="text-sm text-muted-foreground truncate">{email.subject || "(No subject)"}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm text-muted-foreground truncate">{email.subject || "(No subject)"}</p>
+                            {email.webversionUrl && (
+                              <a 
+                                href={email.webversionUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-xs text-primary hover:underline flex items-center gap-0.5"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                View
+                              </a>
+                            )}
+                          </div>
                           {email.previewText && (
                             <p className="text-xs text-muted-foreground/70 truncate mt-1">{email.previewText}</p>
                           )}
