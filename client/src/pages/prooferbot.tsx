@@ -331,27 +331,27 @@ export default function ProoferbotPage() {
                           onCheckedChange={() => toggleSelect(email.id)}
                           data-testid={`checkbox-email-${email.id}`}
                         />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{email.name}</p>
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm text-muted-foreground truncate">{email.subject || "(No subject)"}</p>
-                            {email.webversionUrl && (
-                              <a 
-                                href={email.webversionUrl} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-xs text-primary hover:underline flex items-center gap-0.5"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <ExternalLink className="w-3 h-3" />
-                                View
-                              </a>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{email.name}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm text-muted-foreground truncate">{email.subject || "(No subject)"}</p>
+                              {email.webversionUrl && (
+                                <a 
+                                  href={email.webversionUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded hover:bg-primary/20 transition-colors flex items-center gap-0.5 shrink-0"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <ExternalLink className="w-2.5 h-2.5" />
+                                  VIEW
+                                </a>
+                              )}
+                            </div>
+                            {email.previewText && (
+                              <p className="text-xs text-muted-foreground/70 truncate mt-1">{email.previewText}</p>
                             )}
                           </div>
-                          {email.previewText && (
-                            <p className="text-xs text-muted-foreground/70 truncate mt-1">{email.previewText}</p>
-                          )}
-                        </div>
                         <span className={`text-xs px-2 py-0.5 rounded ${email.state === 'PUBLISHED' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
                           {email.state}
                         </span>
