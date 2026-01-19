@@ -1374,23 +1374,35 @@ export async function registerRoutes(
           try {
             const details = await getMarketingEmailDetails(apiKey, id);
             
-            console.log(`[ProoferBot] Fetched details for email ${id}:`, {
-              name: details.name,
-              subject: details.subject,
-              previewTextLength: details.previewText?.length || 0,
-              htmlLength: details.htmlContent?.length || 0,
-              plainTextLength: details.plainTextContent?.length || 0,
-              campaignName: details.campaignName
-            });
+            let html = details.htmlContent;
+            
+            // Primary source of truth: Web version URL
+            if (details.webversionUrl) {
+              try {
+                console.log(`[ProoferBot] Fetching webversion for email ${id}: ${details.webversionUrl}`);
+                const response = await fetch(details.webversionUrl, { 
+                  timeout: 5000,
+                  headers: { 'User-Agent': 'ProoferBot/1.0' }
+                } as any);
+                if (response.ok) {
+                  html = await response.text();
+                  console.log(`[ProoferBot] Successfully fetched webversion HTML (${html.length} bytes)`);
+                } else {
+                  console.warn(`[ProoferBot] Webversion fetch failed with status ${response.status}`);
+                }
+              } catch (fetchErr) {
+                console.warn(`[ProoferBot] Error fetching webversion for ${id}:`, fetchErr);
+              }
+            }
 
-            // Extract links from HTML if available - improved regex to handle more variations
+            // Extract links from the fetched HTML
             let extractedLinks: { text: string; url: string }[] = [];
-            if (details.htmlContent) {
+            if (html) {
               const linkRegex = /<a\s+(?:[^>]*?\s+)?href=(["'])(.*?)\1[^>]*?>(.*?)<\/a>/gi;
               let match;
-              while ((match = linkRegex.exec(details.htmlContent)) !== null) {
+              while ((match = linkRegex.exec(html)) !== null) {
                 const url = match[2];
-                const text = match[3].replace(/<[^>]*>?/gm, '').trim(); // Strip inner tags
+                const text = match[3].replace(/<[^>]*>?/gm, '').trim();
                 if (url && !url.startsWith('mailto:') && !url.startsWith('tel:') && !url.startsWith('javascript:')) {
                   extractedLinks.push({
                     url,
@@ -1400,13 +1412,12 @@ export async function registerRoutes(
               }
             }
 
-            console.log(`[ProoferBot] Extracted ${extractedLinks.length} links for email ${id}`);
+            console.log(`[ProoferBot] Processed email ${id}: ${extractedLinks.length} links, HTML length: ${html?.length || 0}`);
 
-            // Truncate HTML if extremely large (>50KB)
-            let html = details.htmlContent;
+            // Truncate HTML if extremely large (>75KB)
             let htmlTruncated = false;
-            if (html && html.length > 50000) {
-              html = html.substring(0, 50000);
+            if (html && html.length > 75000) {
+              html = html.substring(0, 75000);
               htmlTruncated = true;
             }
 
@@ -1423,7 +1434,8 @@ export async function registerRoutes(
                 campaignName: details.campaignName || null,
                 sendDate: details.sendDate || null,
                 state: details.state,
-                htmlTruncated
+                htmlTruncated,
+                source: details.webversionUrl ? 'webversion' : 'api'
               }
             };
           } catch (err: any) {

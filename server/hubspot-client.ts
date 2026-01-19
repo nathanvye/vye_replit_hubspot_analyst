@@ -1414,6 +1414,7 @@ export async function getMarketingEmailDetails(
   previewText: string;
   htmlContent: string;
   plainTextContent: string;
+  webversionUrl?: string | null;
   state: string;
   campaignName: string;
   sendDate: string | null;
@@ -1430,17 +1431,8 @@ export async function getMarketingEmailDetails(
 
     const email = await httpResponse.json();
     
-    // Log the structure to help debug why fields are missing
-    console.log(`[HubSpot Email ${emailId}] API Response structure:`, {
-      hasContent: !!email.content,
-      contentFields: email.content ? Object.keys(email.content) : [],
-      hasHtmlBody: !!email.htmlBody,
-      hasBody: !!email.body,
-      hasPreviewText: !!email.previewText,
-      hasCampaign: !!email.campaign,
-      campaignFields: email.campaign ? Object.keys(email.campaign) : [],
-      allKeys: Object.keys(email)
-    });
+    // Log the structure to help debug
+    console.log(`[HubSpot Email ${emailId}] API Response keys:`, Object.keys(email));
 
     return {
       id: email.id,
@@ -1449,6 +1441,7 @@ export async function getMarketingEmailDetails(
       previewText: email.previewText || email.content?.previewText || "",
       htmlContent: email.content?.html || email.htmlBody || email.body || "",
       plainTextContent: email.content?.plainText || email.plainTextBody || "",
+      webversionUrl: email.publishedUrl || email.url || email.absoluteUrl || null,
       state: email.state || "DRAFT",
       campaignName: email.campaign?.name || email.campaignName || email.campaign?.label || "",
       sendDate: email.publishDate || email.sendDate || null,
