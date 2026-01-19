@@ -1374,16 +1374,20 @@ export async function registerRoutes(
           try {
             const details = await getMarketingEmailDetails(apiKey, id);
             
-            // Extract links from HTML if available
+            // Extract links from HTML if available - improved regex to handle more variations
             let extractedLinks: { text: string; url: string }[] = [];
             if (details.htmlContent) {
-              const linkRegex = /<a[^>]+href=["']([^"']+)["'][^>]*>([^<]*)<\/a>/gi;
+              const linkRegex = /<a\s+(?:[^>]*?\s+)?href=(["'])(.*?)\1[^>]*?>(.*?)<\/a>/gi;
               let match;
               while ((match = linkRegex.exec(details.htmlContent)) !== null) {
-                extractedLinks.push({
-                  url: match[1],
-                  text: match[2].trim() || "[No text]"
-                });
+                const url = match[2];
+                const text = match[3].replace(/<[^>]*>?/gm, '').trim(); // Strip inner tags
+                if (url && !url.startsWith('mailto:') && !url.startsWith('tel:')) {
+                  extractedLinks.push({
+                    url,
+                    text: text || "[Button/Image Link]"
+                  });
+                }
               }
             }
 

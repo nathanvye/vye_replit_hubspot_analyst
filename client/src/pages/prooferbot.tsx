@@ -32,27 +32,36 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 function validateTablesOnly(output: string): boolean {
+  // Check if output has any content
+  if (!output || output.trim().length === 0) return true;
+  
   const lines = output.split('\n');
+  let hasTable = false;
+  
   for (const line of lines) {
     const trimmed = line.trim();
     if (trimmed.length === 0) continue;
     
-    if (trimmed.startsWith('|') || trimmed.endsWith('|')) continue;
+    // Check if it's a table row or separator
+    if (trimmed.startsWith('|') || trimmed.endsWith('|') || trimmed.includes('|')) {
+      hasTable = true;
+      continue;
+    }
     
+    // Allow markdown headers
+    if (trimmed.startsWith('#') || trimmed.startsWith('**')) continue;
+    
+    // Allow known label formats
     if (/^Email\s+[A-Z]\s*[—\-–]/.test(trimmed)) continue;
-    
     if (/^(Subject line|Cross-email|Fix table)/i.test(trimmed)) continue;
-    
     if (/^[-=|:]+$/.test(trimmed)) continue;
     
-    if (trimmed.includes('|')) continue;
-    
-    if (/^[A-Z]\s*[—\-–]\s*(Fix table|fix table)/i.test(trimmed)) continue;
-    
-    if (/^(Email|table|consistency)/i.test(trimmed) && trimmed.length < 40) continue;
-    
-    return false;
+    // If it's a long sentence without any table markers, it's likely a paragraph
+    if (trimmed.length > 100 && !trimmed.includes('|')) {
+      return false;
+    }
   }
+  
   return true;
 }
 
@@ -415,9 +424,9 @@ export default function ProoferbotPage() {
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold">Analysis Results</h3>
                 {!isValidFormat && (
-                  <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded flex items-center gap-1">
+                  <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded flex items-center gap-1" title="The AI may have included extra commentary outside of tables">
                     <AlertTriangle className="w-3 h-3" />
-                    Format issue
+                    Format Warning
                   </span>
                 )}
               </div>
@@ -441,7 +450,7 @@ export default function ProoferbotPage() {
             {!isValidFormat && showDebug && (
               <div className="p-4 bg-yellow-50 border-b border-yellow-200">
                 <p className="text-sm text-yellow-800 mb-2">
-                  The output contains non-table content. Raw output shown below for debugging.
+                  The AI response includes commentary outside of the requested tables. You can see the full response below.
                 </p>
               </div>
             )}
