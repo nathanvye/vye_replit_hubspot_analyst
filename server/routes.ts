@@ -1374,6 +1374,15 @@ export async function registerRoutes(
           try {
             const details = await getMarketingEmailDetails(apiKey, id);
             
+            console.log(`[ProoferBot] Fetched details for email ${id}:`, {
+              name: details.name,
+              subject: details.subject,
+              previewTextLength: details.previewText?.length || 0,
+              htmlLength: details.htmlContent?.length || 0,
+              plainTextLength: details.plainTextContent?.length || 0,
+              campaignName: details.campaignName
+            });
+
             // Extract links from HTML if available - improved regex to handle more variations
             let extractedLinks: { text: string; url: string }[] = [];
             if (details.htmlContent) {
@@ -1382,7 +1391,7 @@ export async function registerRoutes(
               while ((match = linkRegex.exec(details.htmlContent)) !== null) {
                 const url = match[2];
                 const text = match[3].replace(/<[^>]*>?/gm, '').trim(); // Strip inner tags
-                if (url && !url.startsWith('mailto:') && !url.startsWith('tel:')) {
+                if (url && !url.startsWith('mailto:') && !url.startsWith('tel:') && !url.startsWith('javascript:')) {
                   extractedLinks.push({
                     url,
                     text: text || "[Button/Image Link]"
@@ -1391,10 +1400,12 @@ export async function registerRoutes(
               }
             }
 
+            console.log(`[ProoferBot] Extracted ${extractedLinks.length} links for email ${id}`);
+
             // Truncate HTML if extremely large (>50KB)
             let html = details.htmlContent;
             let htmlTruncated = false;
-            if (html.length > 50000) {
+            if (html && html.length > 50000) {
               html = html.substring(0, 50000);
               htmlTruncated = true;
             }
