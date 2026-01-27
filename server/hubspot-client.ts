@@ -980,10 +980,7 @@ export async function getPipelineStages(
       path: "/crm/v3/pipelines/deals",
     });
     
-    // Parse the response - apiRequest returns a Response object
-    const response = typeof httpResponse.json === 'function' 
-      ? await httpResponse.json() 
-      : httpResponse;
+    const response = await httpResponse.json();
 
     console.log(`Fetched ${response.results?.length || 0} pipelines`);
 
@@ -1024,9 +1021,7 @@ export async function getDealPipelines(
       path: "/crm/v3/pipelines/deals",
     });
     
-    const response = typeof httpResponse.json === 'function' 
-      ? await httpResponse.json() 
-      : httpResponse;
+    const response = await httpResponse.json();
 
     for (const pipeline of response.results || []) {
       pipelines.push({
