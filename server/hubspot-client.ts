@@ -1007,13 +1007,29 @@ export async function getPipelineStages(
 export async function getDealPipelines(
   apiKey: string,
 ): Promise<{ id: string; label: string; displayOrder: number; stages: { id: string; label: string }[] }[]> {
-  const client = createHubSpotClient(apiKey);
   const pipelines: { id: string; label: string; displayOrder: number; stages: { id: string; label: string }[] }[] = [];
 
   try {
-    const response: any = await client.crm.pipelines.pipelinesApi.getAll("deals");
+    console.log("Fetching pipelines via direct fetch...");
+    const res = await fetch(
+      "https://api.hubapi.com/crm/v3/pipelines/deals",
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`
+        }
+      }
+    );
 
-    for (const pipeline of response.results || []) {
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error(`HubSpot API error (${res.status}): ${errorText}`);
+      return [];
+    }
+
+    const data = await res.json();
+    console.log("Direct fetch pipeline result:", JSON.stringify(data, null, 2));
+
+    for (const pipeline of data.results || []) {
       pipelines.push({
         id: pipeline.id,
         label: pipeline.label,
@@ -1027,7 +1043,7 @@ export async function getDealPipelines(
   } catch (error: any) {
     console.error(
       "Error fetching deal pipelines:",
-      error.body?.message || error.message,
+      error.message,
     );
   }
 
