@@ -1010,43 +1010,39 @@ export async function getDealPipelines(
   const pipelines: { id: string; label: string; displayOrder: number; stages: { id: string; label: string }[] }[] = [];
 
   try {
-    console.log("Fetching pipelines via direct fetch for 'deals'...");
+    console.log("Fetching pipelines for deals via direct fetch...");
     const res = await fetch(
       "https://api.hubapi.com/crm/v3/pipelines/deals",
       {
         headers: {
           "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json"
-        }
+        },
       }
     );
 
     const data = await res.json();
-    console.log("Direct fetch pipeline raw result:", JSON.stringify(data, null, 2));
 
     if (!res.ok) {
-      console.error(`HubSpot API error (${res.status}):`, JSON.stringify(data, null, 2));
+      console.error("HubSpot error:", JSON.stringify(data, null, 2));
       return [];
     }
 
-    console.log("Direct fetch pipeline result success");
-
-    for (const pipeline of data.results || []) {
-      pipelines.push({
-        id: pipeline.id,
-        label: pipeline.label,
-        displayOrder: pipeline.displayOrder || 0,
-        stages: (pipeline.stages || []).map((s: any) => ({
-          id: s.id,
-          label: s.label,
-        })),
-      });
+    if (data.results) {
+      for (const pipeline of data.results) {
+        console.log(`${pipeline.label} → ${pipeline.id}`);
+        pipelines.push({
+          id: pipeline.id,
+          label: pipeline.label,
+          displayOrder: pipeline.displayOrder || 0,
+          stages: (pipeline.stages || []).map((s: any) => ({
+            id: s.id,
+            label: s.label,
+          })),
+        });
+      }
     }
   } catch (error: any) {
-    console.error(
-      "Error fetching deal pipelines:",
-      error.message,
-    );
+    console.error("Error fetching deal pipelines:", error.message);
   }
 
   return pipelines;
