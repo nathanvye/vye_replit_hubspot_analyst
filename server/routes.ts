@@ -487,14 +487,16 @@ export async function registerRoutes(
       const { accountId } = req.params;
       const apiKey = await getApiKeyForAccount(accountId);
       if (!apiKey) {
+        console.error(`[Pipelines] API key not found for account ${accountId}`);
         return res.status(400).json({ error: "Could not find API key for account" });
       }
 
-      console.log(`Fetching pipelines for account ${accountId}...`);
+      console.log(`[Pipelines] Fetching for account ${accountId}...`);
       const pipelines = await getDealPipelines(apiKey);
+      console.log(`[Pipelines] Found ${pipelines.length} pipelines for account ${accountId}`);
       res.json(pipelines);
     } catch (error) {
-      console.error("Error fetching pipelines:", error);
+      console.error("[Pipelines] Error fetching pipelines:", error);
       res.status(500).json({ error: "Failed to fetch pipelines" });
     }
   });
