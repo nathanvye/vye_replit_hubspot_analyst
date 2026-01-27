@@ -477,6 +477,120 @@ export async function registerRoutes(
   });
 
   // ==========================================
+  // Deal Display Settings & Pipelines
+  // ==========================================
+
+  // Get available pipelines from HubSpot
+  app.get("/api/hubspot/pipelines/:accountId", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const account = await storage.getHubspotAccountById(accountId);
+      if (!account) {
+        return res.status(404).json({ error: "Account not found" });
+      }
+
+      const pipelineStages = await fetchPipelineStages(account.apiKey);
+      const pipelines: { id: string; label: string; stages: any[] }[] = [];
+      
+      const seenPipelines = new Set<string>();
+      for (const [stageId, stageInfo] of Object.entries(pipelineStages)) {
+        const pipelineId = (stageInfo as any).pipelineId;
+        const pipelineLabel = (stageInfo as any).pipelineLabel;
+        if (pipelineId && !seenPipelines.has(pipelineId)) {
+          seenPipelines.add(pipelineId);
+          pipelines.push({
+            id: pipelineId,
+            label: pipelineLabel || pipelineId,
+            stages: [],
+          });
+        }
+      }
+
+      res.json(pipelines);
+    } catch (error) {
+      console.error("Error fetching pipelines:", error);
+      res.status(500).json({ error: "Failed to fetch pipelines" });
+    }
+  });
+
+  // Get deal display settings
+  app.get("/api/deal-display-settings/:accountId", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const settings = await storage.getDealDisplaySettings(accountId);
+      res.json(settings || { showNewDeals: "true", selectedPipelines: [] });
+    } catch (error) {
+      console.error("Error fetching deal display settings:", error);
+      res.status(500).json({ error: "Failed to fetch deal display settings" });
+    }
+  });
+
+  // Save deal display settings
+  const dealDisplaySettingsSchema = z.object({
+    hubspotAccountId: z.string().min(1, "Account ID is required"),
+    showNewDeals: z.string().optional().default("true"),
+    selectedPipelines: z.array(z.string()).optional().default([]),
+  });
+
+  app.post("/api/deal-display-settings", async (req, res) => {
+    try {
+      const parseResult = dealDisplaySettingsSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: parseResult.error.errors[0]?.message || "Invalid request" });
+      }
+
+      const settings = await storage.upsertDealDisplaySettings(parseResult.data);
+      res.json(settings);
+    } catch (error) {
+      console.error("Error saving deal display settings:", error);
+      res.status(500).json({ error: "Failed to save deal display settings" });
+    }
+  });
+
+  // Get pipeline goals for an account
+  app.get("/api/pipeline-goals/:accountId", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const goals = await storage.getPipelineGoalsByAccount(accountId);
+      res.json(goals);
+    } catch (error) {
+      console.error("Error fetching pipeline goals:", error);
+      res.status(500).json({ error: "Failed to fetch pipeline goals" });
+    }
+  });
+
+  // Save pipeline goal
+  const pipelineGoalSchema = z.object({
+    hubspotAccountId: z.string().min(1, "Account ID is required"),
+    pipelineId: z.string().min(1, "Pipeline ID is required"),
+    pipelineName: z.string().min(1, "Pipeline name is required"),
+    year: z.number().min(2020).max(2100),
+    q1Goal: integerOrStringSchema.optional().default(0),
+    q2Goal: integerOrStringSchema.optional().default(0),
+    q3Goal: integerOrStringSchema.optional().default(0),
+    q4Goal: integerOrStringSchema.optional().default(0),
+    q1ValueGoal: integerOrStringSchema.optional().default(0),
+    q2ValueGoal: integerOrStringSchema.optional().default(0),
+    q3ValueGoal: integerOrStringSchema.optional().default(0),
+    q4ValueGoal: integerOrStringSchema.optional().default(0),
+  });
+
+  app.post("/api/pipeline-goals", async (req, res) => {
+    try {
+      const parseResult = pipelineGoalSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: parseResult.error.errors[0]?.message || "Invalid request" });
+      }
+
+      const goal = await storage.upsertPipelineGoal(parseResult.data);
+      res.json(goal);
+    } catch (error) {
+      console.error("Error saving pipeline goal:", error);
+      res.status(500).json({ error: "Failed to save pipeline goal" });
+    }
+  });
+
+  // ==========================================
   // Google Analytics
   // ==========================================
 
