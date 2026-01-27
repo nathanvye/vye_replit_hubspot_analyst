@@ -13,7 +13,9 @@ import type {
   InsertFormGoal, FormGoal,
   InsertKpiGoal, KpiGoal,
   InsertGoogleAnalyticsConfig, GoogleAnalyticsConfig,
-  InsertGoogleBusinessProfileConfig, GoogleBusinessProfileConfig
+  InsertGoogleBusinessProfileConfig, GoogleBusinessProfileConfig,
+  InsertDealDisplaySettings, DealDisplaySettings,
+  InsertPipelineGoal, PipelineGoal
 } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 
@@ -87,6 +89,16 @@ export interface IStorage {
   upsertGoogleBusinessProfileConfig(config: InsertGoogleBusinessProfileConfig): Promise<GoogleBusinessProfileConfig>;
   updateGoogleBusinessProfileTokens(hubspotAccountId: string, accessToken: string, tokenExpiry: Date): Promise<void>;
   deleteGoogleBusinessProfileConfig(hubspotAccountId: string): Promise<void>;
+
+  // Deal Display Settings
+  getDealDisplaySettings(hubspotAccountId: string): Promise<DealDisplaySettings | undefined>;
+  upsertDealDisplaySettings(settings: InsertDealDisplaySettings): Promise<DealDisplaySettings>;
+
+  // Pipeline Goals
+  getPipelineGoalsByAccount(hubspotAccountId: string): Promise<PipelineGoal[]>;
+  getPipelineGoalByAccountPipelineAndYear(hubspotAccountId: string, pipelineId: string, year: number): Promise<PipelineGoal | undefined>;
+  upsertPipelineGoal(goal: InsertPipelineGoal): Promise<PipelineGoal>;
+  deletePipelineGoal(id: string): Promise<void>;
 }
 
 class Storage implements IStorage {
@@ -381,6 +393,79 @@ class Storage implements IStorage {
   async deleteGoogleBusinessProfileConfig(hubspotAccountId: string): Promise<void> {
     await db.delete(schema.googleBusinessProfileConfig)
       .where(eq(schema.googleBusinessProfileConfig.hubspotAccountId, hubspotAccountId));
+  }
+
+  // Deal Display Settings
+  async getDealDisplaySettings(hubspotAccountId: string): Promise<DealDisplaySettings | undefined> {
+    const result = await db.select()
+      .from(schema.dealDisplaySettings)
+      .where(eq(schema.dealDisplaySettings.hubspotAccountId, hubspotAccountId))
+      .limit(1);
+    return result[0];
+  }
+
+  async upsertDealDisplaySettings(settings: InsertDealDisplaySettings): Promise<DealDisplaySettings> {
+    const existing = await this.getDealDisplaySettings(settings.hubspotAccountId);
+    if (existing) {
+      const result = await db.update(schema.dealDisplaySettings)
+        .set({
+          showNewDeals: settings.showNewDeals,
+          selectedPipelines: settings.selectedPipelines,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.dealDisplaySettings.id, existing.id))
+        .returning();
+      return result[0];
+    }
+    const result = await db.insert(schema.dealDisplaySettings).values(settings).returning();
+    return result[0];
+  }
+
+  // Pipeline Goals
+  async getPipelineGoalsByAccount(hubspotAccountId: string): Promise<PipelineGoal[]> {
+    return await db.select()
+      .from(schema.pipelineGoals)
+      .where(eq(schema.pipelineGoals.hubspotAccountId, hubspotAccountId))
+      .orderBy(schema.pipelineGoals.year);
+  }
+
+  async getPipelineGoalByAccountPipelineAndYear(hubspotAccountId: string, pipelineId: string, year: number): Promise<PipelineGoal | undefined> {
+    const result = await db.select()
+      .from(schema.pipelineGoals)
+      .where(and(
+        eq(schema.pipelineGoals.hubspotAccountId, hubspotAccountId),
+        eq(schema.pipelineGoals.pipelineId, pipelineId),
+        eq(schema.pipelineGoals.year, year)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async upsertPipelineGoal(goal: InsertPipelineGoal): Promise<PipelineGoal> {
+    const existing = await this.getPipelineGoalByAccountPipelineAndYear(goal.hubspotAccountId, goal.pipelineId, goal.year);
+    if (existing) {
+      const result = await db.update(schema.pipelineGoals)
+        .set({
+          pipelineName: goal.pipelineName,
+          q1Goal: goal.q1Goal,
+          q2Goal: goal.q2Goal,
+          q3Goal: goal.q3Goal,
+          q4Goal: goal.q4Goal,
+          q1ValueGoal: goal.q1ValueGoal,
+          q2ValueGoal: goal.q2ValueGoal,
+          q3ValueGoal: goal.q3ValueGoal,
+          q4ValueGoal: goal.q4ValueGoal,
+        })
+        .where(eq(schema.pipelineGoals.id, existing.id))
+        .returning();
+      return result[0];
+    }
+    const result = await db.insert(schema.pipelineGoals).values(goal).returning();
+    return result[0];
+  }
+
+  async deletePipelineGoal(id: string): Promise<void> {
+    await db.delete(schema.pipelineGoals).where(eq(schema.pipelineGoals.id, id));
   }
 }
 

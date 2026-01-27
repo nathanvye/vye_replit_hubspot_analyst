@@ -203,7 +203,7 @@ export type GoogleBusinessProfileConfig = typeof googleBusinessProfileConfig.$in
 export const kpiGoals = pgTable("kpi_goals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   hubspotAccountId: varchar("hubspot_account_id").notNull().references(() => hubspotAccounts.id, { onDelete: "cascade" }),
-  metric: text("metric").notNull(), // "Contacts", "Sessions", etc.
+  metric: text("metric").notNull(), // "Contacts", "Sessions", "MQLs", "SQLs", "New Deals", etc.
   year: integer("year").notNull(),
   q1Goal: integer("q1_goal").default(0),
   q2Goal: integer("q2_goal").default(0),
@@ -216,3 +216,44 @@ export const insertKpiGoalSchema = createInsertSchema(kpiGoals).omit({
 });
 export type InsertKpiGoal = z.infer<typeof insertKpiGoalSchema>;
 export type KpiGoal = typeof kpiGoals.$inferSelect;
+
+// Deal Display Settings - controls which pipelines to show in reports
+export const dealDisplaySettings = pgTable("deal_display_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  hubspotAccountId: varchar("hubspot_account_id").notNull().references(() => hubspotAccounts.id, { onDelete: "cascade" }),
+  showNewDeals: text("show_new_deals").default("true"), // "true" or "false"
+  selectedPipelines: jsonb("selected_pipelines").default([]), // Array of pipeline IDs
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertDealDisplaySettingsSchema = createInsertSchema(dealDisplaySettings).omit({ 
+  id: true, 
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertDealDisplaySettings = z.infer<typeof insertDealDisplaySettingsSchema>;
+export type DealDisplaySettings = typeof dealDisplaySettings.$inferSelect;
+
+// Pipeline Goals - quarterly targets for deals in a specific pipeline per year
+export const pipelineGoals = pgTable("pipeline_goals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  hubspotAccountId: varchar("hubspot_account_id").notNull().references(() => hubspotAccounts.id, { onDelete: "cascade" }),
+  pipelineId: text("pipeline_id").notNull(),
+  pipelineName: text("pipeline_name").notNull(),
+  year: integer("year").notNull(),
+  q1Goal: integer("q1_goal").default(0),
+  q2Goal: integer("q2_goal").default(0),
+  q3Goal: integer("q3_goal").default(0),
+  q4Goal: integer("q4_goal").default(0),
+  q1ValueGoal: integer("q1_value_goal").default(0),
+  q2ValueGoal: integer("q2_value_goal").default(0),
+  q3ValueGoal: integer("q3_value_goal").default(0),
+  q4ValueGoal: integer("q4_value_goal").default(0),
+});
+
+export const insertPipelineGoalSchema = createInsertSchema(pipelineGoals).omit({ 
+  id: true 
+});
+export type InsertPipelineGoal = z.infer<typeof insertPipelineGoalSchema>;
+export type PipelineGoal = typeof pipelineGoals.$inferSelect;
