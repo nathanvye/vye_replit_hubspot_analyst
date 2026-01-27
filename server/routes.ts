@@ -16,7 +16,8 @@ import {
   getListById,
   getLifecycleStageBreakdown,
   getMarketingEmails,
-  getMarketingEmailDetails
+  getMarketingEmailDetails,
+  getDealPipelines
 } from "./hubspot-client";
 import { PROOFERBOT_SYSTEM_PROMPT, PROOFERBOT_MODEL_SETTINGS } from "../config/prooferbotRules";
 import OpenAI from 'openai';
@@ -489,23 +490,7 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Account not found" });
       }
 
-      const pipelineStages = await fetchPipelineStages(account.apiKey);
-      const pipelines: { id: string; label: string; stages: any[] }[] = [];
-      
-      const seenPipelines = new Set<string>();
-      for (const [stageId, stageInfo] of Object.entries(pipelineStages)) {
-        const pipelineId = (stageInfo as any).pipelineId;
-        const pipelineLabel = (stageInfo as any).pipelineLabel;
-        if (pipelineId && !seenPipelines.has(pipelineId)) {
-          seenPipelines.add(pipelineId);
-          pipelines.push({
-            id: pipelineId,
-            label: pipelineLabel || pipelineId,
-            stages: [],
-          });
-        }
-      }
-
+      const pipelines = await getDealPipelines(account.apiKey);
       res.json(pipelines);
     } catch (error) {
       console.error("Error fetching pipelines:", error);

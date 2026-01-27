@@ -21,6 +21,8 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft,
   Plus,
@@ -42,6 +44,7 @@ import {
   ExternalLink,
   Star,
   Unplug,
+  Briefcase,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -123,6 +126,13 @@ export default function SettingsPage() {
   const [kpiGoals, setKpiGoals] = useState<Record<string, any>>({});
   const [isSavingKpiGoal, setIsSavingKpiGoal] = useState(false);
 
+  // Deal Display Settings state
+  const [showNewDeals, setShowNewDeals] = useState(true);
+  const [availablePipelines, setAvailablePipelines] = useState<{ id: string; label: string }[]>([]);
+  const [selectedPipelines, setSelectedPipelines] = useState<string[]>([]);
+  const [isLoadingPipelines, setIsLoadingPipelines] = useState(false);
+  const [isSavingDealSettings, setIsSavingDealSettings] = useState(false);
+
   // Google Analytics config state
   const [gaPropertyId, setGaPropertyId] = useState<string>("");
   const [isSavingGaConfig, setIsSavingGaConfig] = useState(false);
@@ -177,6 +187,8 @@ export default function SettingsPage() {
     loadKpiGoals();
     loadGaConfig();
     loadGbpConfig();
+    loadDealDisplaySettings();
+    loadPipelines();
   }, [user, selectedAccount, setLocation]);
 
   const loadGaConfig = async () => {
@@ -603,7 +615,82 @@ export default function SettingsPage() {
     }
   };
 
-  const kpiMetrics = ["Contacts", "Page Views"];
+  const kpiMetrics = ["Contacts", "Page Views", "MQLs", "SQLs", "New Deals"];
+
+  const loadDealDisplaySettings = async () => {
+    if (!selectedAccount) return;
+    try {
+      const response = await fetch(`/api/deal-display-settings/${selectedAccount}`);
+      if (response.ok) {
+        const data = await response.json();
+        setShowNewDeals(data.showNewDeals === "true");
+        setSelectedPipelines(data.selectedPipelines || []);
+      }
+    } catch (error) {
+      console.error("Failed to load deal display settings:", error);
+    }
+  };
+
+  const loadPipelines = async () => {
+    if (!selectedAccount) return;
+    setIsLoadingPipelines(true);
+    try {
+      const response = await fetch(`/api/hubspot/pipelines/${selectedAccount}`);
+      if (response.ok) {
+        const data = await response.json();
+        setAvailablePipelines(data);
+      }
+    } catch (error) {
+      console.error("Failed to load pipelines:", error);
+    } finally {
+      setIsLoadingPipelines(false);
+    }
+  };
+
+  const handleSaveDealDisplaySettings = async () => {
+    if (!selectedAccount) return;
+    setIsSavingDealSettings(true);
+    try {
+      const response = await fetch("/api/deal-display-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hubspotAccountId: selectedAccount,
+          showNewDeals: showNewDeals ? "true" : "false",
+          selectedPipelines,
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Settings Saved",
+          description: "Deal display settings have been saved.",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to save deal display settings",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save deal display settings. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDealSettings(false);
+    }
+  };
+
+  const handlePipelineToggle = (pipelineId: string) => {
+    setSelectedPipelines((prev) =>
+      prev.includes(pipelineId)
+        ? prev.filter((id) => id !== pipelineId)
+        : [...prev, pipelineId]
+    );
+  };
 
   const { toast } = useToast();
 
@@ -1335,6 +1422,120 @@ export default function SettingsPage() {
                       </div>
                     );
                   })}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Briefcase className="w-5 h-5" />
+                      Deal Display Settings
+                    </CardTitle>
+                    <CardDescription>
+                      Configure which deals and pipelines to show in reports.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={loadPipelines}
+                    disabled={isLoadingPipelines}
+                    data-testid="button-refresh-pipelines"
+                  >
+                    <RefreshCw
+                      className={`w-4 h-4 mr-2 ${isLoadingPipelines ? "animate-spin" : ""}`}
+                    />
+                    Refresh
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                  <div className="space-y-1">
+                    <Label htmlFor="show-new-deals" className="font-medium">
+                      Show New Deals in Reports
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Include new deals metrics in the KPI table.
+                    </p>
+                  </div>
+                  <Switch
+                    id="show-new-deals"
+                    checked={showNewDeals}
+                    onCheckedChange={setShowNewDeals}
+                    data-testid="switch-show-new-deals"
+                  />
+                </div>
+
+                {showNewDeals && (
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-sm font-medium mb-3 block">
+                        Select Pipelines to Show
+                      </Label>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Choose which pipelines to include in the New Deals row. If none selected, all deals will be shown.
+                      </p>
+                      
+                      {isLoadingPipelines ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : availablePipelines.length === 0 ? (
+                        <div className="text-center py-6 text-muted-foreground bg-muted/30 rounded-lg">
+                          <Briefcase className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">No pipelines found</p>
+                          <p className="text-xs">Click Refresh to load pipelines from HubSpot</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2 max-h-[200px] overflow-y-auto border rounded-lg p-3">
+                          {availablePipelines.map((pipeline) => (
+                            <div
+                              key={pipeline.id}
+                              className="flex items-center space-x-3 p-2 hover:bg-muted/30 rounded"
+                            >
+                              <Checkbox
+                                id={`pipeline-${pipeline.id}`}
+                                checked={selectedPipelines.includes(pipeline.id)}
+                                onCheckedChange={() => handlePipelineToggle(pipeline.id)}
+                                data-testid={`checkbox-pipeline-${pipeline.id}`}
+                              />
+                              <label
+                                htmlFor={`pipeline-${pipeline.id}`}
+                                className="text-sm font-medium cursor-pointer flex-1"
+                              >
+                                {pipeline.label}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {selectedPipelines.length > 0 && (
+                      <div className="text-xs text-muted-foreground">
+                        {selectedPipelines.length} pipeline(s) selected
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-2">
+                  <Button
+                    onClick={handleSaveDealDisplaySettings}
+                    disabled={isSavingDealSettings}
+                    data-testid="button-save-deal-settings"
+                  >
+                    {isSavingDealSettings ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : (
+                      <Save className="w-4 h-4 mr-2" />
+                    )}
+                    Save Settings
+                  </Button>
                 </div>
               </CardContent>
             </Card>

@@ -1011,6 +1011,44 @@ export async function getPipelineStages(
   return stageMap;
 }
 
+// Get list of deal pipelines
+export async function getDealPipelines(
+  apiKey: string,
+): Promise<{ id: string; label: string; displayOrder: number; stages: { id: string; label: string }[] }[]> {
+  const client = createHubSpotClient(apiKey);
+  const pipelines: { id: string; label: string; displayOrder: number; stages: { id: string; label: string }[] }[] = [];
+
+  try {
+    const httpResponse: any = await client.apiRequest({
+      method: "GET",
+      path: "/crm/v3/pipelines/deals",
+    });
+    
+    const response = typeof httpResponse.json === 'function' 
+      ? await httpResponse.json() 
+      : httpResponse;
+
+    for (const pipeline of response.results || []) {
+      pipelines.push({
+        id: pipeline.id,
+        label: pipeline.label,
+        displayOrder: pipeline.displayOrder || 0,
+        stages: (pipeline.stages || []).map((s: any) => ({
+          id: s.id,
+          label: s.label,
+        })),
+      });
+    }
+  } catch (error: any) {
+    console.error(
+      "Error fetching deal pipelines:",
+      error.body?.message || error.message,
+    );
+  }
+
+  return pipelines;
+}
+
 // Fetch contacts with lifecycle stage history (includes "became X" dates)
 export async function getContactsWithLifecycleHistory(
   apiKey: string,
