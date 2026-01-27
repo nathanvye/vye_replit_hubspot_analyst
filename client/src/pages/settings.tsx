@@ -703,6 +703,8 @@ export default function SettingsPage() {
     loadAvailableForms();
     loadLists();
     loadAvailableLists();
+    loadDealDisplaySettings();
+    loadPipelines();
   }, [user, selectedAccount, setLocation]);
 
   const loadForms = async () => {

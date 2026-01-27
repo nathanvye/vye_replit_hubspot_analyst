@@ -1171,6 +1171,7 @@ export async function getComprehensiveData(
   apiKey: string,
   maxRecords = PAGINATION_CONFIG.maxRecords,
   year: number = new Date().getFullYear(),
+  pipelineFilter: string[] = [],
 ) {
   console.log(`Starting comprehensive data fetch with pagination for year ${year}...`);
 
@@ -1182,6 +1183,7 @@ export async function getComprehensiveData(
     stageMap,
     contactsQuarterly,
     websiteSessionsData,
+    lifecycleData,
   ] = await Promise.all([
     getDeals(apiKey, maxRecords).catch((e) => {
       console.error("Deals fetch error:", e.body?.message || e.message);
@@ -1203,6 +1205,10 @@ export async function getComprehensiveData(
     }),
     // Website sessions tracking removed for now
     Promise.resolve({ Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 }),
+    getLifecycleStageBreakdown(apiKey, year).catch((e) => {
+      console.error("Lifecycle data fetch error:", e.body?.message || e.message);
+      return { currentCounts: {}, quarterlyBecame: {} };
+    }),
   ]);
 
   console.log(
@@ -1336,6 +1342,19 @@ export async function getComprehensiveData(
     }
   }
 
+  // New deals by quarter with pipeline filtering
+  const newDealsByQuarter = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
+  for (const deal of enrichedDeals) {
+    // Apply pipeline filter if specified
+    if (pipelineFilter.length > 0 && !pipelineFilter.includes(deal.pipeline)) {
+      continue;
+    }
+    const q = getQuarter(deal.createDate);
+    if (q) {
+      newDealsByQuarter[q]++;
+    }
+  }
+
   // Companies by quarter
   const companiesByQuarter = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
   for (const company of enrichedCompanies) {
@@ -1349,6 +1368,10 @@ export async function getComprehensiveData(
     const stage = contact.lifecycleStage || "Unknown";
     lifecycleSummary[stage] = (lifecycleSummary[stage] || 0) + 1;
   }
+
+  // Extract MQL and SQL quarterly data from lifecycle data
+  const mqlQuarterly = lifecycleData.quarterlyBecame["Marketing Qualified Lead"] || { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
+  const sqlQuarterly = lifecycleData.quarterlyBecame["Sales Qualified Lead"] || { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
 
   return {
     deals: enrichedDeals,
@@ -1372,7 +1395,11 @@ export async function getComprehensiveData(
         deals: dealsByQuarter,
         dealValue: dealValueByQuarter,
         companies: companiesByQuarter,
+        newDeals: newDealsByQuarter,
+        mql: mqlQuarterly,
+        sql: sqlQuarterly,
       },
+      lifecycleData,
     },
   };
 }

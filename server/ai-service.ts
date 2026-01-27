@@ -105,7 +105,11 @@ function formatNumber(value: number): string {
   return value.toLocaleString('en-US');
 }
 
-export async function generateReport(hubspotData: any, context: LearnedContext[], gaData?: { pageViews: any, channels: any[] }, focusAreas?: string): Promise<any> {
+interface ReportOptions {
+  showNewDeals?: boolean;
+}
+
+export async function generateReport(hubspotData: any, context: LearnedContext[], gaData?: { pageViews: any, channels: any[] }, focusAreas?: string, options?: ReportOptions): Promise<any> {
   const learnedContextPrompt = context.length > 0
     ? `\n\nCustom terminology:\n${context.map(lc => `- ${lc.key}: ${lc.value}`).join('\n')}`
     : '';
@@ -301,7 +305,37 @@ CRITICAL: Every number you mention MUST include commas and come from the VERIFIE
           q3: { projection: '-', actual: gaPageViews.Q3 },
           q4: { projection: '-', actual: gaPageViews.Q4 },
           goal: ''
-        }
+        },
+        {
+          metric: "MQLs",
+          subtext: `Marketing Qualified Leads (${quarterly.year})`,
+          yearEndProjection: (quarterly.mql?.Q1 || 0) + (quarterly.mql?.Q2 || 0) + (quarterly.mql?.Q3 || 0) + (quarterly.mql?.Q4 || 0),
+          q1: { projection: '-', actual: quarterly.mql?.Q1 || 0 },
+          q2: { projection: '-', actual: quarterly.mql?.Q2 || 0 },
+          q3: { projection: '-', actual: quarterly.mql?.Q3 || 0 },
+          q4: { projection: '-', actual: quarterly.mql?.Q4 || 0 },
+          goal: ''
+        },
+        {
+          metric: "SQLs",
+          subtext: `Sales Qualified Leads (${quarterly.year})`,
+          yearEndProjection: (quarterly.sql?.Q1 || 0) + (quarterly.sql?.Q2 || 0) + (quarterly.sql?.Q3 || 0) + (quarterly.sql?.Q4 || 0),
+          q1: { projection: '-', actual: quarterly.sql?.Q1 || 0 },
+          q2: { projection: '-', actual: quarterly.sql?.Q2 || 0 },
+          q3: { projection: '-', actual: quarterly.sql?.Q3 || 0 },
+          q4: { projection: '-', actual: quarterly.sql?.Q4 || 0 },
+          goal: ''
+        },
+        ...(options?.showNewDeals !== false ? [{
+          metric: "New Deals",
+          subtext: `Deals created in HubSpot (${quarterly.year})`,
+          yearEndProjection: (quarterly.newDeals?.Q1 || 0) + (quarterly.newDeals?.Q2 || 0) + (quarterly.newDeals?.Q3 || 0) + (quarterly.newDeals?.Q4 || 0),
+          q1: { projection: '-', actual: quarterly.newDeals?.Q1 || 0 },
+          q2: { projection: '-', actual: quarterly.newDeals?.Q2 || 0 },
+          q3: { projection: '-', actual: quarterly.newDeals?.Q3 || 0 },
+          q4: { projection: '-', actual: quarterly.newDeals?.Q4 || 0 },
+          goal: ''
+        }] : [])
       ]
     },
     // Stage/owner breakdowns come from SERVER calculations

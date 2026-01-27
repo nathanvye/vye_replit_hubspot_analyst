@@ -1184,8 +1184,12 @@ export async function registerRoutes(
         return res.status(400).json({ error: "HubSpot account not configured or API key missing" });
       }
 
+      // Load deal display settings to get pipeline filter
+      const dealDisplaySettings = await storage.getDealDisplaySettings(hubspotAccountId);
+      const pipelineFilter = dealDisplaySettings?.selectedPipelines || [];
+
       // Use comprehensive data with pre-calculated summaries for the specified year
-      const hubspotData = await getComprehensiveData(apiKey, undefined, reportYear);
+      const hubspotData = await getComprehensiveData(apiKey, undefined, reportYear, pipelineFilter);
       const learnedContext = await storage.getLearnedContextByAccount(hubspotAccountId);
       
       // Fetch form submissions for saved forms for the specified year
@@ -1302,7 +1306,8 @@ export async function registerRoutes(
         // Silent catch for GBP data errors
       }
 
-      const reportData = await generateReport(hubspotData, learnedContext, { pageViews: gaPageViews, channels: gaChannels }, sanitizedFocusAreas);
+      const showNewDeals = dealDisplaySettings?.showNewDeals === "true";
+      const reportData = await generateReport(hubspotData, learnedContext, { pageViews: gaPageViews, channels: gaChannels }, sanitizedFocusAreas, { showNewDeals });
       
       // Add extra data to report object
       reportData.formSubmissions = formSubmissionsData;
@@ -1354,7 +1359,10 @@ export async function registerRoutes(
       
       if (apiKey) {
         try {
-          hubspotData = await getComprehensiveData(apiKey, undefined, year || new Date().getFullYear());
+          // Load deal display settings to get pipeline filter
+          const dealDisplaySettings = await storage.getDealDisplaySettings(hubspotAccountId);
+          const pipelineFilter = dealDisplaySettings?.selectedPipelines || [];
+          hubspotData = await getComprehensiveData(apiKey, undefined, year || new Date().getFullYear(), pipelineFilter);
         } catch (err) {
           // Silent catch for HubSpot data errors in Q&A
         }
