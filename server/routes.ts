@@ -17,7 +17,8 @@ import {
   getLifecycleStageBreakdown,
   getMarketingEmails,
   getMarketingEmailDetails,
-  getDealPipelines
+  getDealPipelines,
+  getLifecycleStageOptions
 } from "./hubspot-client";
 import { PROOFERBOT_SYSTEM_PROMPT, PROOFERBOT_MODEL_SETTINGS } from "../config/prooferbotRules";
 import OpenAI from 'openai';
@@ -575,6 +576,61 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error saving pipeline goal:", error);
       res.status(500).json({ error: "Failed to save pipeline goal" });
+    }
+  });
+
+  // ==========================================
+  // Lifecycle Stage Settings
+  // ==========================================
+
+  // Get lifecycle stage options from HubSpot
+  app.get("/api/hubspot/lifecycle-stages/:accountId", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const apiKey = await getApiKeyForAccount(accountId);
+      if (!apiKey) {
+        return res.status(404).json({ error: "Account not found or API key missing" });
+      }
+
+      const stages = await getLifecycleStageOptions(apiKey);
+      res.json(stages);
+    } catch (error) {
+      console.error("Error fetching lifecycle stages:", error);
+      res.status(500).json({ error: "Failed to fetch lifecycle stages" });
+    }
+  });
+
+  // Get lifecycle stage settings
+  app.get("/api/lifecycle-stage-settings/:accountId", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const settings = await storage.getLifecycleStageSettings(accountId);
+      res.json(settings || { mqlStage: null, sqlStage: null });
+    } catch (error) {
+      console.error("Error fetching lifecycle stage settings:", error);
+      res.status(500).json({ error: "Failed to fetch lifecycle stage settings" });
+    }
+  });
+
+  // Save lifecycle stage settings
+  const lifecycleStageSettingsSchema = z.object({
+    hubspotAccountId: z.string().min(1, "Account ID is required"),
+    mqlStage: z.string().nullable().optional(),
+    sqlStage: z.string().nullable().optional(),
+  });
+
+  app.post("/api/lifecycle-stage-settings", async (req, res) => {
+    try {
+      const parseResult = lifecycleStageSettingsSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: parseResult.error.errors[0]?.message || "Invalid request" });
+      }
+
+      const settings = await storage.upsertLifecycleStageSettings(parseResult.data);
+      res.json(settings);
+    } catch (error) {
+      console.error("Error saving lifecycle stage settings:", error);
+      res.status(500).json({ error: "Failed to save lifecycle stage settings" });
     }
   });
 

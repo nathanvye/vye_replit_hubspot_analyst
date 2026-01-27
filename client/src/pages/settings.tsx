@@ -135,6 +135,15 @@ export default function SettingsPage() {
   const [isLoadingPipelines, setIsLoadingPipelines] = useState(false);
   const [isSavingDealSettings, setIsSavingDealSettings] = useState(false);
 
+  // Lifecycle Stage Settings state
+  const [lifecycleStageOptions, setLifecycleStageOptions] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [mqlStage, setMqlStage] = useState<string>("");
+  const [sqlStage, setSqlStage] = useState<string>("");
+  const [isLoadingLifecycleStages, setIsLoadingLifecycleStages] = useState(false);
+  const [isSavingLifecycleSettings, setIsSavingLifecycleSettings] = useState(false);
+
   // Google Analytics config state
   const [gaPropertyId, setGaPropertyId] = useState<string>("");
   const [isSavingGaConfig, setIsSavingGaConfig] = useState(false);
@@ -191,6 +200,8 @@ export default function SettingsPage() {
     loadGbpConfig();
     loadDealDisplaySettings();
     loadPipelines();
+    loadLifecycleStageOptions();
+    loadLifecycleStageSettings();
   }, [user, selectedAccount, setLocation]);
 
   const loadGaConfig = async () => {
@@ -635,6 +646,70 @@ export default function SettingsPage() {
     }
   };
 
+  const loadLifecycleStageOptions = async () => {
+    if (!selectedAccount) return;
+    setIsLoadingLifecycleStages(true);
+    try {
+      const response = await fetch(`/api/hubspot/lifecycle-stages/${selectedAccount}`);
+      if (response.ok) {
+        const data = await response.json();
+        setLifecycleStageOptions(data);
+      }
+    } catch (error) {
+      console.error("Failed to load lifecycle stages:", error);
+    } finally {
+      setIsLoadingLifecycleStages(false);
+    }
+  };
+
+  const loadLifecycleStageSettings = async () => {
+    if (!selectedAccount) return;
+    try {
+      const response = await fetch(`/api/lifecycle-stage-settings/${selectedAccount}`);
+      if (response.ok) {
+        const data = await response.json();
+        setMqlStage(data.mqlStage || "");
+        setSqlStage(data.sqlStage || "");
+      }
+    } catch (error) {
+      console.error("Failed to load lifecycle stage settings:", error);
+    }
+  };
+
+  const handleSaveLifecycleSettings = async () => {
+    if (!selectedAccount) return;
+    setIsSavingLifecycleSettings(true);
+    try {
+      const response = await fetch("/api/lifecycle-stage-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hubspotAccountId: selectedAccount,
+          mqlStage: mqlStage || null,
+          sqlStage: sqlStage || null,
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Settings Saved",
+          description: "Lifecycle stage settings have been updated.",
+        });
+      } else {
+        throw new Error("Failed to save");
+      }
+    } catch (error) {
+      console.error("Failed to save lifecycle stage settings:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save lifecycle stage settings.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingLifecycleSettings(false);
+    }
+  };
+
   const loadPipelines = async () => {
     if (!selectedAccount) return;
 
@@ -710,6 +785,8 @@ export default function SettingsPage() {
     loadAvailableLists();
     loadDealDisplaySettings();
     loadPipelines();
+    loadLifecycleStageOptions();
+    loadLifecycleStageSettings();
   }, [user, selectedAccount, setLocation]);
 
   const loadForms = async () => {
@@ -1475,6 +1552,95 @@ export default function SettingsPage() {
                     onCheckedChange={setShowNewDeals}
                     data-testid="switch-show-new-deals"
                   />
+                </div>
+
+                <div className="space-y-6 pt-2">
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="mql-stage" className="text-sm font-medium">
+                          MQLs
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Select which lifecycle stage represents an MQL
+                        </p>
+                        <Select
+                          value={mqlStage}
+                          onValueChange={setMqlStage}
+                          disabled={isLoadingLifecycleStages}
+                        >
+                          <SelectTrigger id="mql-stage" className="w-full" data-testid="select-mql-stage">
+                            {isLoadingLifecycleStages ? (
+                              <div className="flex items-center">
+                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                Loading...
+                              </div>
+                            ) : (
+                              <SelectValue placeholder="Select MQL stage" />
+                            )}
+                          </SelectTrigger>
+                          <SelectContent>
+                            {lifecycleStageOptions.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="sql-stage" className="text-sm font-medium">
+                          SQLs
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Select which lifecycle stage represents an SQL
+                        </p>
+                        <Select
+                          value={sqlStage}
+                          onValueChange={setSqlStage}
+                          disabled={isLoadingLifecycleStages}
+                        >
+                          <SelectTrigger id="sql-stage" className="w-full" data-testid="select-sql-stage">
+                            {isLoadingLifecycleStages ? (
+                              <div className="flex items-center">
+                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                Loading...
+                              </div>
+                            ) : (
+                              <SelectValue placeholder="Select SQL stage" />
+                            )}
+                          </SelectTrigger>
+                          <SelectContent>
+                            {lifecycleStageOptions.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSaveLifecycleSettings}
+                        disabled={isSavingLifecycleSettings}
+                        data-testid="button-save-lifecycle-settings"
+                      >
+                        {isSavingLifecycleSettings ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        ) : (
+                          <Save className="w-4 h-4 mr-2" />
+                        )}
+                        Save Lifecycle Settings
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4" />
                 </div>
 
                 {showNewDeals && (

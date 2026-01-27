@@ -15,7 +15,8 @@ import type {
   InsertGoogleAnalyticsConfig, GoogleAnalyticsConfig,
   InsertGoogleBusinessProfileConfig, GoogleBusinessProfileConfig,
   InsertDealDisplaySettings, DealDisplaySettings,
-  InsertPipelineGoal, PipelineGoal
+  InsertPipelineGoal, PipelineGoal,
+  InsertLifecycleStageSettings, LifecycleStageSettings
 } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 
@@ -99,6 +100,10 @@ export interface IStorage {
   getPipelineGoalByAccountPipelineAndYear(hubspotAccountId: string, pipelineId: string, year: number): Promise<PipelineGoal | undefined>;
   upsertPipelineGoal(goal: InsertPipelineGoal): Promise<PipelineGoal>;
   deletePipelineGoal(id: string): Promise<void>;
+
+  // Lifecycle Stage Settings
+  getLifecycleStageSettings(hubspotAccountId: string): Promise<LifecycleStageSettings | undefined>;
+  upsertLifecycleStageSettings(settings: InsertLifecycleStageSettings): Promise<LifecycleStageSettings>;
 }
 
 class Storage implements IStorage {
@@ -466,6 +471,32 @@ class Storage implements IStorage {
 
   async deletePipelineGoal(id: string): Promise<void> {
     await db.delete(schema.pipelineGoals).where(eq(schema.pipelineGoals.id, id));
+  }
+
+  // Lifecycle Stage Settings
+  async getLifecycleStageSettings(hubspotAccountId: string): Promise<LifecycleStageSettings | undefined> {
+    const result = await db.select()
+      .from(schema.lifecycleStageSettings)
+      .where(eq(schema.lifecycleStageSettings.hubspotAccountId, hubspotAccountId))
+      .limit(1);
+    return result[0];
+  }
+
+  async upsertLifecycleStageSettings(settings: InsertLifecycleStageSettings): Promise<LifecycleStageSettings> {
+    const existing = await this.getLifecycleStageSettings(settings.hubspotAccountId);
+    if (existing) {
+      const result = await db.update(schema.lifecycleStageSettings)
+        .set({
+          mqlStage: settings.mqlStage,
+          sqlStage: settings.sqlStage,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.lifecycleStageSettings.id, existing.id))
+        .returning();
+      return result[0];
+    }
+    const result = await db.insert(schema.lifecycleStageSettings).values(settings).returning();
+    return result[0];
   }
 }
 

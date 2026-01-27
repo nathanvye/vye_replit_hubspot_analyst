@@ -257,3 +257,21 @@ export const insertPipelineGoalSchema = createInsertSchema(pipelineGoals).omit({
 });
 export type InsertPipelineGoal = z.infer<typeof insertPipelineGoalSchema>;
 export type PipelineGoal = typeof pipelineGoals.$inferSelect;
+
+// Lifecycle Stage Settings - maps MQL and SQL to HubSpot lifecycle stages
+export const lifecycleStageSettings = pgTable("lifecycle_stage_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  hubspotAccountId: varchar("hubspot_account_id").notNull().references(() => hubspotAccounts.id, { onDelete: "cascade" }),
+  mqlStage: text("mql_stage"),
+  sqlStage: text("sql_stage"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertLifecycleStageSettingsSchema = createInsertSchema(lifecycleStageSettings).omit({ 
+  id: true, 
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertLifecycleStageSettings = z.infer<typeof insertLifecycleStageSettingsSchema>;
+export type LifecycleStageSettings = typeof lifecycleStageSettings.$inferSelect;

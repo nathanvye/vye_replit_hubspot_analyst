@@ -1781,3 +1781,33 @@ export async function getMarketingEmailDetails(
     throw error;
   }
 }
+
+export interface LifecycleStageOption {
+  label: string;
+  value: string;
+}
+
+export async function getLifecycleStageOptions(apiKey: string): Promise<LifecycleStageOption[]> {
+  try {
+    const client = createHubSpotClient(apiKey);
+    const response: any = await client.apiRequest({
+      method: "GET",
+      path: "/crm/v3/properties/contacts/lifecyclestage",
+    });
+
+    if (response?.options && Array.isArray(response.options)) {
+      return response.options.map((option: any) => ({
+        label: option.label || option.value,
+        value: option.value,
+      }));
+    }
+
+    return [];
+  } catch (error: any) {
+    console.error(
+      "Error fetching lifecycle stage options:",
+      error.body?.message || error.message,
+    );
+    throw error;
+  }
+}
