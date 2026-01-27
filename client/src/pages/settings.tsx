@@ -128,7 +128,9 @@ export default function SettingsPage() {
 
   // Deal Display Settings state
   const [showNewDeals, setShowNewDeals] = useState(true);
-  const [availablePipelines, setAvailablePipelines] = useState<{ id: string; label: string }[]>([]);
+  const [availablePipelines, setAvailablePipelines] = useState<
+    { id: string; label: string }[]
+  >([]);
   const [selectedPipelines, setSelectedPipelines] = useState<string[]>([]);
   const [isLoadingPipelines, setIsLoadingPipelines] = useState(false);
   const [isSavingDealSettings, setIsSavingDealSettings] = useState(false);
@@ -620,7 +622,9 @@ export default function SettingsPage() {
   const loadDealDisplaySettings = async () => {
     if (!selectedAccount) return;
     try {
-      const response = await fetch(`/api/deal-display-settings/${selectedAccount}`);
+      const response = await fetch(
+        `/api/deal-display-settings/${selectedAccount}`,
+      );
       if (response.ok) {
         const data = await response.json();
         setShowNewDeals(data.showNewDeals === "true");
@@ -633,6 +637,7 @@ export default function SettingsPage() {
 
   const loadPipelines = async () => {
     if (!selectedAccount) return;
+
     setIsLoadingPipelines(true);
     try {
       const response = await fetch(`/api/hubspot/pipelines/${selectedAccount}`);
@@ -688,7 +693,7 @@ export default function SettingsPage() {
     setSelectedPipelines((prev) =>
       prev.includes(pipelineId)
         ? prev.filter((id) => id !== pipelineId)
-        : [...prev, pipelineId]
+        : [...prev, pipelineId],
     );
   };
 
@@ -1479,9 +1484,10 @@ export default function SettingsPage() {
                         Select Pipelines to Show
                       </Label>
                       <p className="text-xs text-muted-foreground mb-3">
-                        Choose which pipelines to include in the New Deals row. If none selected, all deals will be shown.
+                        Choose which pipelines to include in the New Deals row.
+                        If none selected, all deals will be shown.
                       </p>
-                      
+
                       {isLoadingPipelines ? (
                         <div className="flex items-center justify-center py-8">
                           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -1490,7 +1496,9 @@ export default function SettingsPage() {
                         <div className="text-center py-6 text-muted-foreground bg-muted/30 rounded-lg">
                           <Briefcase className="w-8 h-8 mx-auto mb-2 opacity-50" />
                           <p className="text-sm">No pipelines found</p>
-                          <p className="text-xs">Click Refresh to load pipelines from HubSpot</p>
+                          <p className="text-xs">
+                            Click Refresh to load pipelines from HubSpot
+                          </p>
                         </div>
                       ) : (
                         <div className="space-y-2 max-h-[200px] overflow-y-auto border rounded-lg p-3">
@@ -1501,8 +1509,12 @@ export default function SettingsPage() {
                             >
                               <Checkbox
                                 id={`pipeline-${pipeline.id}`}
-                                checked={selectedPipelines.includes(pipeline.id)}
-                                onCheckedChange={() => handlePipelineToggle(pipeline.id)}
+                                checked={selectedPipelines.includes(
+                                  pipeline.id,
+                                )}
+                                onCheckedChange={() =>
+                                  handlePipelineToggle(pipeline.id)
+                                }
                                 data-testid={`checkbox-pipeline-${pipeline.id}`}
                               />
                               <label

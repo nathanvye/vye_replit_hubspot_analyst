@@ -370,25 +370,32 @@ export async function getAllLists(
 
       const response = await httpResponse.json();
       const results = response?.lists || [];
-      console.log(`Found ${results.length} lists in this page (offset: ${offset})`);
+      console.log(
+        `Found ${results.length} lists in this page (offset: ${offset})`,
+      );
 
       // Log first list structure to debug
       if (offset === 0 && results.length > 0) {
-        console.log("Sample list structure:", JSON.stringify(results[0], null, 2));
+        console.log(
+          "Sample list structure:",
+          JSON.stringify(results[0], null, 2),
+        );
       }
-      
+
       for (const list of results) {
         // Try multiple possible locations for the size/member count
         // HubSpot v3 Lists API typically returns size in metaData.size
-        let rawSize = list.metaData?.size 
-          ?? list.additionalProperties?.hs_list_size 
-          ?? list.size 
-          ?? 0;
-        
+        let rawSize =
+          list.metaData?.size ??
+          list.additionalProperties?.hs_list_size ??
+          list.size ??
+          0;
+
         // Ensure we have a valid number
-        const size = typeof rawSize === 'number' ? rawSize : parseInt(String(rawSize), 10);
+        const size =
+          typeof rawSize === "number" ? rawSize : parseInt(String(rawSize), 10);
         const validSize = isNaN(size) ? 0 : size;
-        
+
         lists.push({
           listId: list.listId?.toString() || "",
           name: list.name || "Unnamed List",
@@ -398,8 +405,9 @@ export async function getAllLists(
 
       // Check for more pages using offset-based pagination
       hasMore = response?.hasMore === true;
-      offset = response?.offset !== undefined ? response.offset : offset + count;
-      
+      offset =
+        response?.offset !== undefined ? response.offset : offset + count;
+
       // Safety cap
       if (lists.length >= 10000) {
         console.log("Reached max lists limit, stopping pagination");
@@ -425,9 +433,7 @@ export async function getAllLists(
 export async function getListById(
   apiKey: string,
   listId: string,
-): Promise<
-  { listId: string; name: string; size: number } | { error: string }
-> {
+): Promise<{ listId: string; name: string; size: number } | { error: string }> {
   const client = createHubSpotClient(apiKey);
 
   try {
@@ -437,23 +443,25 @@ export async function getListById(
     });
 
     const response = await httpResponse.json();
-    
+
     console.log("List by ID response:", JSON.stringify(response, null, 2));
-    
+
     // In HubSpot v3, the list details are often wrapped in a 'list' property
     const listData = response.list || response;
     const name = listData.name || listData.label || "Unknown List";
-    
+
     // Get size from metaData.size (HubSpot v3 Lists API standard location)
-    let rawSize = listData.metaData?.size 
-      ?? listData.additionalProperties?.hs_list_size 
-      ?? listData.size 
-      ?? 0;
-    
+    let rawSize =
+      listData.metaData?.size ??
+      listData.additionalProperties?.hs_list_size ??
+      listData.size ??
+      0;
+
     // Ensure we have a valid number
-    const size = typeof rawSize === 'number' ? rawSize : parseInt(String(rawSize), 10);
+    const size =
+      typeof rawSize === "number" ? rawSize : parseInt(String(rawSize), 10);
     const validSize = isNaN(size) ? 0 : size;
-    
+
     if (validSize === 0 && rawSize !== 0) {
       console.warn(`List ${listId} has non-numeric size value:`, rawSize);
     }
@@ -862,58 +870,74 @@ async function runReportForDateRange(
   apiKey: string,
   reportId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
 ): Promise<number> {
   try {
-    console.log(`Step 2: POST https://api.hubapi.com/reports/v2/reports/${reportId}/data`);
+    console.log(
+      `Step 2: POST https://api.hubapi.com/reports/v2/reports/${reportId}/data`,
+    );
     console.log(`  Date range: ${startDate} to ${endDate}`);
-    
-    const response = await fetch(`https://api.hubapi.com/reports/v2/reports/${reportId}/data`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "Accept": "application/json",
+
+    const response = await fetch(
+      `https://api.hubapi.com/reports/v2/reports/${reportId}/data`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          startDate,
+          endDate,
+        }),
       },
-      body: JSON.stringify({
-        startDate,
-        endDate,
-      }),
-    });
+    );
 
     console.log(`Report data response status: ${response.status}`);
-    
+
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Report data API error (${response.status}):`, errorText.substring(0, 500));
+      console.error(
+        `Report data API error (${response.status}):`,
+        errorText.substring(0, 500),
+      );
       return 0;
     }
 
     const data = await response.json();
-    console.log(`Report data response:`, JSON.stringify(data, null, 2).substring(0, 1000));
-    
+    console.log(
+      `Report data response:`,
+      JSON.stringify(data, null, 2).substring(0, 1000),
+    );
+
     // Step 3: Sum all values from the data array
     let totalSessions = 0;
-    
+
     if (data.data && Array.isArray(data.data)) {
       for (const row of data.data) {
         const value = row.value || row.sessions || row.visits || row.count || 0;
-        if (typeof value === 'number') {
+        if (typeof value === "number") {
           totalSessions += value;
-        } else if (typeof value === 'string') {
+        } else if (typeof value === "string") {
           totalSessions += parseInt(value, 10) || 0;
         }
       }
-      console.log(`Step 3: Summed ${data.data.length} sources = ${totalSessions} total sessions`);
+      console.log(
+        `Step 3: Summed ${data.data.length} sources = ${totalSessions} total sessions`,
+      );
     } else if (data.totals?.sessions !== undefined) {
       totalSessions = data.totals.sessions;
     } else if (data.total !== undefined) {
       totalSessions = data.total;
     }
-    
+
     return totalSessions;
   } catch (error: any) {
-    console.error(`Error running report for ${startDate}-${endDate}:`, error.message);
+    console.error(
+      `Error running report for ${startDate}-${endDate}:`,
+      error.message,
+    );
     return 0;
   }
 }
@@ -925,12 +949,32 @@ async function runReportForDateRange(
 export async function getWebsiteSessionsQuarterly(
   apiKey: string,
   year: number = new Date().getFullYear(),
-): Promise<{ Q1: number; Q2: number; Q3: number; Q4: number; total: number; status?: string }> {
-  const results: { Q1: number; Q2: number; Q3: number; Q4: number; total: number; status?: string } = { 
-    Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 
+): Promise<{
+  Q1: number;
+  Q2: number;
+  Q3: number;
+  Q4: number;
+  total: number;
+  status?: string;
+}> {
+  const results: {
+    Q1: number;
+    Q2: number;
+    Q3: number;
+    Q4: number;
+    total: number;
+    status?: string;
+  } = {
+    Q1: 0,
+    Q2: 0,
+    Q3: 0,
+    Q4: 0,
+    total: 0,
   };
 
-  console.log(`Fetching website sessions for ${year} using report ID: ${TRAFFIC_REPORT_ID}`);
+  console.log(
+    `Fetching website sessions for ${year} using report ID: ${TRAFFIC_REPORT_ID}`,
+  );
 
   // Define quarter boundaries (YYYY-MM-DD format)
   const quarters = {
@@ -941,7 +985,7 @@ export async function getWebsiteSessionsQuarterly(
   };
 
   let quarterIndex = 0;
-  
+
   for (const [quarter, range] of Object.entries(quarters)) {
     // Add delay between quarters to avoid rate limiting
     if (quarterIndex > 0) {
@@ -950,17 +994,23 @@ export async function getWebsiteSessionsQuarterly(
     quarterIndex++;
 
     // Run report and sum values
-    const sessions = await runReportForDateRange(apiKey, TRAFFIC_REPORT_ID, range.start, range.end);
-    if (quarter === 'Q1') results.Q1 = sessions;
-    else if (quarter === 'Q2') results.Q2 = sessions;
-    else if (quarter === 'Q3') results.Q3 = sessions;
-    else if (quarter === 'Q4') results.Q4 = sessions;
+    const sessions = await runReportForDateRange(
+      apiKey,
+      TRAFFIC_REPORT_ID,
+      range.start,
+      range.end,
+    );
+    if (quarter === "Q1") results.Q1 = sessions;
+    else if (quarter === "Q2") results.Q2 = sessions;
+    else if (quarter === "Q3") results.Q3 = sessions;
+    else if (quarter === "Q4") results.Q4 = sessions;
     results.total += sessions;
     console.log(`${year} ${quarter} website sessions: ${sessions}`);
   }
 
   if (results.total === 0) {
-    results.status = "Sessions returned 0. Check server logs for API response details.";
+    results.status =
+      "Sessions returned 0. Check server logs for API response details.";
   }
 
   console.log(`Total ${year} website sessions: ${results.total}`);
@@ -975,12 +1025,15 @@ export async function getPipelineStages(
   const stageMap = new Map<string, { label: string; probability: number }>();
 
   try {
-    const response: any = await client.crm.pipelines.pipelinesApi.getAll("deals");
+    const response: any =
+      await client.crm.pipelines.pipelinesApi.getAll("deals");
 
     console.log(`Fetched ${response.results?.length || 0} pipelines`);
 
     for (const pipeline of response.results || []) {
-      console.log(`Pipeline: ${pipeline.label} (${pipeline.id}) with ${pipeline.stages?.length || 0} stages`);
+      console.log(
+        `Pipeline: ${pipeline.label} (${pipeline.id}) with ${pipeline.stages?.length || 0} stages`,
+      );
       for (const stage of pipeline.stages || []) {
         stageMap.set(stage.id, {
           label: stage.label,
@@ -991,7 +1044,7 @@ export async function getPipelineStages(
         console.log(`  Stage: ${stage.id} -> ${stage.label}`);
       }
     }
-    
+
     console.log(`Total stages mapped: ${stageMap.size}`);
   } catch (error: any) {
     console.error(
@@ -1004,45 +1057,46 @@ export async function getPipelineStages(
 }
 
 // Get list of deal pipelines
-export async function getDealPipelines(
-  apiKey: string,
-): Promise<{ id: string; label: string; displayOrder: number; stages: { id: string; label: string }[] }[]> {
-  const pipelines: { id: string; label: string; displayOrder: number; stages: { id: string; label: string }[] }[] = [];
+export async function getDealPipelines(privateAppToken: string): Promise<
+  {
+    id: string;
+    label: string;
+    displayOrder: number;
+    stages: { id: string; label: string }[];
+  }[]
+> {
+  const pipelines = [];
 
   try {
-    console.log("Fetching pipelines for deals via direct fetch...");
-    const res = await fetch(
-      "https://api.hubapi.com/crm/v3/pipelines/deals",
-      {
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-        },
-      }
-    );
+    console.log("N8: Fetching deal pipelines...");
+
+    const res = await fetch("https://api.hubapi.com/crm/v3/pipelines/deals", {
+      headers: {
+        Authorization: `Bearer ${privateAppToken}`,
+        "Content-Type": "application/json",
+      },
+    });
 
     const data = await res.json();
-
+    console.log("N8: Deal pipelines response:", JSON.stringify(data, null, 2));
     if (!res.ok) {
-      console.error("HubSpot error:", JSON.stringify(data, null, 2));
+      console.error("HubSpot API error:", data);
       return [];
     }
 
-    if (data.results) {
-      for (const pipeline of data.results) {
-        console.log(`${pipeline.label} → ${pipeline.id}`);
-        pipelines.push({
-          id: pipeline.id,
-          label: pipeline.label,
-          displayOrder: pipeline.displayOrder || 0,
-          stages: (pipeline.stages || []).map((s: any) => ({
-            id: s.id,
-            label: s.label,
-          })),
-        });
-      }
+    for (const pipeline of data.results || []) {
+      pipelines.push({
+        id: pipeline.id,
+        label: pipeline.label,
+        displayOrder: pipeline.displayOrder ?? 0,
+        stages: (pipeline.stages || []).map((s: any) => ({
+          id: s.id,
+          label: s.label,
+        })),
+      });
     }
-  } catch (error: any) {
-    console.error("Error fetching deal pipelines:", error.message);
+  } catch (err: any) {
+    console.error("Error fetching deal pipelines:", err);
   }
 
   return pipelines;
@@ -1090,18 +1144,45 @@ export async function getLifecycleStageBreakdown(
   year: number = new Date().getFullYear(),
 ): Promise<{
   currentCounts: Record<string, number>;
-  quarterlyBecame: Record<string, { Q1: number; Q2: number; Q3: number; Q4: number; total: number }>;
+  quarterlyBecame: Record<
+    string,
+    { Q1: number; Q2: number; Q3: number; Q4: number; total: number }
+  >;
 }> {
   const contacts = await getContactsWithLifecycleHistory(apiKey);
 
   const lifecycleStages = [
-    { key: "subscriber", label: "Subscriber", dateField: "hs_lifecyclestage_subscriber_date" },
+    {
+      key: "subscriber",
+      label: "Subscriber",
+      dateField: "hs_lifecyclestage_subscriber_date",
+    },
     { key: "lead", label: "Lead", dateField: "hs_lifecyclestage_lead_date" },
-    { key: "marketingqualifiedlead", label: "Marketing Qualified Lead", dateField: "hs_lifecyclestage_marketingqualifiedlead_date" },
-    { key: "salesqualifiedlead", label: "Sales Qualified Lead", dateField: "hs_lifecyclestage_salesqualifiedlead_date" },
-    { key: "opportunity", label: "Opportunity", dateField: "hs_lifecyclestage_opportunity_date" },
-    { key: "customer", label: "Customer", dateField: "hs_lifecyclestage_customer_date" },
-    { key: "evangelist", label: "Evangelist", dateField: "hs_lifecyclestage_evangelist_date" },
+    {
+      key: "marketingqualifiedlead",
+      label: "Marketing Qualified Lead",
+      dateField: "hs_lifecyclestage_marketingqualifiedlead_date",
+    },
+    {
+      key: "salesqualifiedlead",
+      label: "Sales Qualified Lead",
+      dateField: "hs_lifecyclestage_salesqualifiedlead_date",
+    },
+    {
+      key: "opportunity",
+      label: "Opportunity",
+      dateField: "hs_lifecyclestage_opportunity_date",
+    },
+    {
+      key: "customer",
+      label: "Customer",
+      dateField: "hs_lifecyclestage_customer_date",
+    },
+    {
+      key: "evangelist",
+      label: "Evangelist",
+      dateField: "hs_lifecyclestage_evangelist_date",
+    },
     { key: "other", label: "Other", dateField: "hs_lifecyclestage_other_date" },
   ];
 
@@ -1112,15 +1193,20 @@ export async function getLifecycleStageBreakdown(
   }
 
   // Quarterly "became X" counts
-  const quarterlyBecame: Record<string, { Q1: number; Q2: number; Q3: number; Q4: number; total: number }> = {};
+  const quarterlyBecame: Record<
+    string,
+    { Q1: number; Q2: number; Q3: number; Q4: number; total: number }
+  > = {};
   for (const stage of lifecycleStages) {
     quarterlyBecame[stage.label] = { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
   }
 
-  const getQuarter = (dateValue: string | number): "Q1" | "Q2" | "Q3" | "Q4" | null => {
+  const getQuarter = (
+    dateValue: string | number,
+  ): "Q1" | "Q2" | "Q3" | "Q4" | null => {
     // If the value is a string, check if it's a numeric string (timestamp)
     let finalDate: Date;
-    if (typeof dateValue === 'string') {
+    if (typeof dateValue === "string") {
       if (/^\d+$/.test(dateValue)) {
         finalDate = new Date(parseInt(dateValue));
       } else {
@@ -1141,19 +1227,20 @@ export async function getLifecycleStageBreakdown(
 
   for (const contact of contacts) {
     const currentStage = contact.properties.lifecyclestage;
-    
+
     // Count current stage
-    const stageInfo = lifecycleStages.find(s => s.key === currentStage);
+    const stageInfo = lifecycleStages.find((s) => s.key === currentStage);
     if (stageInfo) {
       currentCounts[stageInfo.label]++;
     }
 
     // Count "became X" dates per quarter
     for (const stage of lifecycleStages) {
-      const becameValue = contact.properties[stage.dateField as keyof typeof contact.properties];
+      const becameValue =
+        contact.properties[stage.dateField as keyof typeof contact.properties];
       // HubSpot sometimes returns empty strings, null, or "0" for dates that haven't occurred
       if (!becameValue || becameValue === "0" || becameValue === "") continue;
-      
+
       const quarter = getQuarter(becameValue as string | number);
       if (quarter) {
         quarterlyBecame[stage.label][quarter]++;
@@ -1172,7 +1259,9 @@ export async function getComprehensiveData(
   year: number = new Date().getFullYear(),
   pipelineFilter: string[] = [],
 ) {
-  console.log(`Starting comprehensive data fetch with pagination for year ${year}...`);
+  console.log(
+    `Starting comprehensive data fetch with pagination for year ${year}...`,
+  );
 
   const [
     deals,
@@ -1199,13 +1288,19 @@ export async function getComprehensiveData(
     getOwners(apiKey),
     getPipelineStages(apiKey),
     getContactsQuarterly(apiKey, year).catch((e) => {
-      console.error(`${year} contacts fetch error:`, e.body?.message || e.message);
+      console.error(
+        `${year} contacts fetch error:`,
+        e.body?.message || e.message,
+      );
       return { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
     }),
     // Website sessions tracking removed for now
     Promise.resolve({ Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 }),
     getLifecycleStageBreakdown(apiKey, year).catch((e) => {
-      console.error("Lifecycle data fetch error:", e.body?.message || e.message);
+      console.error(
+        "Lifecycle data fetch error:",
+        e.body?.message || e.message,
+      );
       return { currentCounts: {}, quarterlyBecame: {} };
     }),
   ]);
@@ -1253,13 +1348,19 @@ export async function getComprehensiveData(
       owner: ownerId ? ownerMap.get(ownerId) || "Unknown" : "Unassigned",
       lifecycleStage: contact.properties.lifecyclestage || "",
       lifecycleHistory: {
-        subscriber: contact.properties.hs_lifecyclestage_subscriber_date || null,
+        subscriber:
+          contact.properties.hs_lifecyclestage_subscriber_date || null,
         lead: contact.properties.hs_lifecyclestage_lead_date || null,
-        mql: contact.properties.hs_lifecyclestage_marketingqualifiedlead_date || null,
-        sql: contact.properties.hs_lifecyclestage_salesqualifiedlead_date || null,
-        opportunity: contact.properties.hs_lifecyclestage_opportunity_date || null,
+        mql:
+          contact.properties.hs_lifecyclestage_marketingqualifiedlead_date ||
+          null,
+        sql:
+          contact.properties.hs_lifecyclestage_salesqualifiedlead_date || null,
+        opportunity:
+          contact.properties.hs_lifecyclestage_opportunity_date || null,
         customer: contact.properties.hs_lifecyclestage_customer_date || null,
-        evangelist: contact.properties.hs_lifecyclestage_evangelist_date || null,
+        evangelist:
+          contact.properties.hs_lifecyclestage_evangelist_date || null,
         other: contact.properties.hs_lifecyclestage_other_date || null,
       },
       leadStatus: contact.properties.hs_lead_status || "",
@@ -1369,8 +1470,12 @@ export async function getComprehensiveData(
   }
 
   // Extract MQL and SQL quarterly data from lifecycle data
-  const mqlQuarterly = lifecycleData.quarterlyBecame["Marketing Qualified Lead"] || { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
-  const sqlQuarterly = lifecycleData.quarterlyBecame["Sales Qualified Lead"] || { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
+  const mqlQuarterly = lifecycleData.quarterlyBecame[
+    "Marketing Qualified Lead"
+  ] || { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
+  const sqlQuarterly = lifecycleData.quarterlyBecame[
+    "Sales Qualified Lead"
+  ] || { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
 
   return {
     deals: enrichedDeals,
@@ -1406,16 +1511,18 @@ export async function getComprehensiveData(
 // Fetch marketing emails from HubSpot
 export async function getMarketingEmails(
   apiKey: string,
-  limit: number = 100
-): Promise<{
-  id: string;
-  name: string;
-  subject: string;
-  previewText: string;
-  state: string;
-  createdAt: string;
-  webversionUrl?: string | null;
-}[]> {
+  limit: number = 100,
+): Promise<
+  {
+    id: string;
+    name: string;
+    subject: string;
+    previewText: string;
+    state: string;
+    createdAt: string;
+    webversionUrl?: string | null;
+  }[]
+> {
   const client = createHubSpotClient(apiKey);
   const emails: {
     id: string;
@@ -1435,7 +1542,10 @@ export async function getMarketingEmails(
       const httpResponse: any = await client.apiRequest({
         method: "GET",
         path: "/marketing/v3/emails",
-        qs: { limit: Math.min(100, limit - fetched), ...(after ? { after } : {}) },
+        qs: {
+          limit: Math.min(100, limit - fetched),
+          ...(after ? { after } : {}),
+        },
       });
 
       const response = await httpResponse.json();
@@ -1449,7 +1559,8 @@ export async function getMarketingEmails(
           previewText: email.previewText || "",
           state: email.state || "DRAFT",
           createdAt: email.createdAt || "",
-          webversionUrl: email.publishedUrl || email.url || email.webversion?.url || null,
+          webversionUrl:
+            email.publishedUrl || email.url || email.webversion?.url || null,
         });
       }
 
@@ -1458,7 +1569,10 @@ export async function getMarketingEmails(
     } while (after && fetched < limit);
 
     console.log(`Fetched ${emails.length} marketing emails`);
-    emails.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    emails.sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
   } catch (error: any) {
     console.error(
       "Error fetching marketing emails:",
@@ -1476,25 +1590,29 @@ export async function getMarketingEmails(
  */
 function extractEmailHtmlBody(email: any): string {
   const content = email.content;
-  
+
   if (!content) {
     return "";
   }
 
   // 1. Prefer direct HTML if present (normal emails)
-  if (content.html && typeof content.html === 'string' && content.html.trim()) {
+  if (content.html && typeof content.html === "string" && content.html.trim()) {
     return content.html;
   }
-  
+
   // Fallback to plaintext wrapped in <pre> if available
-  if (content.plaintext && typeof content.plaintext === 'string' && content.plaintext.trim()) {
+  if (
+    content.plaintext &&
+    typeof content.plaintext === "string" &&
+    content.plaintext.trim()
+  ) {
     return `<pre>${content.plaintext}</pre>`;
   }
 
   // 2. Reconstruct HTML from drag-and-drop / system modules
   const flexAreas = content.flexAreas;
   const widgetsById = content.widgets || {};
-  
+
   if (!flexAreas?.main?.sections || !Array.isArray(flexAreas.main.sections)) {
     // No flex areas, nothing to reconstruct
     return "";
@@ -1505,14 +1623,14 @@ function extractEmailHtmlBody(email: any): string {
   // Walk the layout tree IN ORDER
   for (const section of flexAreas.main.sections) {
     if (!section.columns || !Array.isArray(section.columns)) continue;
-    
+
     for (const column of section.columns) {
       if (!column.widgets || !Array.isArray(column.widgets)) continue;
-      
+
       for (const widgetRef of column.widgets) {
         const widgetId = widgetRef.id || widgetRef;
         const widget = widgetsById[widgetId];
-        
+
         if (!widget) continue;
 
         // Extract HTML from widget using the defined rules
@@ -1533,7 +1651,7 @@ function extractEmailHtmlBody(email: any): string {
 <html>
 <head><meta charset="utf-8"></head>
 <body>
-${htmlBlocks.join('\n')}
+${htmlBlocks.join("\n")}
 </body>
 </html>`;
 }
@@ -1547,25 +1665,25 @@ function extractWidgetHtml(widget: any): string | null {
     return widget.body.html;
   }
 
-  // Rule 2: widget.richText.html exists  
+  // Rule 2: widget.richText.html exists
   if (widget.richText?.html) {
     return widget.richText.html;
   }
 
   // Rule 3: widget.text exists
-  if (widget.text && typeof widget.text === 'string') {
+  if (widget.text && typeof widget.text === "string") {
     return `<p>${widget.text}</p>`;
   }
 
   // Rule 4: Image widget
-  if (widget.type === 'image' && widget.src) {
-    const alt = widget.alt || '';
+  if (widget.type === "image" && widget.src) {
+    const alt = widget.alt || "";
     return `<img src="${widget.src}" alt="${alt}" />`;
   }
 
   // Rule 5: CTA widget
-  if (widget.type === 'cta' && widget.link) {
-    const text = widget.text || 'View';
+  if (widget.type === "cta" && widget.link) {
+    const text = widget.text || "View";
     return `<a href="${widget.link}">${text}</a>`;
   }
 
@@ -1573,17 +1691,18 @@ function extractWidgetHtml(widget: any): string | null {
   if (widget.params?.html) {
     return widget.params.html;
   }
-  
+
   if (widget.params?.text) {
     return `<p>${widget.params.text}</p>`;
   }
 
   // Check for button widgets
-  if (widget.type === 'button' || widget.type === 'linked_image') {
-    const href = widget.params?.href || widget.link || widget.url || '#';
-    const text = widget.params?.text || widget.text || widget.alt || 'Click here';
+  if (widget.type === "button" || widget.type === "linked_image") {
+    const href = widget.params?.href || widget.link || widget.url || "#";
+    const text =
+      widget.params?.text || widget.text || widget.alt || "Click here";
     const src = widget.params?.src || widget.src;
-    
+
     if (src) {
       return `<a href="${href}"><img src="${src}" alt="${text}" /></a>`;
     }
@@ -1597,7 +1716,7 @@ function extractWidgetHtml(widget: any): string | null {
 // Fetch full details of a marketing email by ID
 export async function getMarketingEmailDetails(
   apiKey: string,
-  emailId: string
+  emailId: string,
 ): Promise<{
   id: string;
   name: string;
@@ -1621,26 +1740,35 @@ export async function getMarketingEmailDetails(
     });
 
     const email = await httpResponse.json();
-    
+
     // Log the keys to see what's available
     console.log(`[HubSpot Email ${emailId}] API Keys:`, Object.keys(email));
     if (email.content) {
-      console.log(`[HubSpot Email ${emailId}] Content keys:`, Object.keys(email.content));
+      console.log(
+        `[HubSpot Email ${emailId}] Content keys:`,
+        Object.keys(email.content),
+      );
     }
 
     // Extract HTML using the comprehensive algorithm
     const extractedHtml = extractEmailHtmlBody(email);
-    
+
     return {
       id: email.id,
       name: email.name || "Unnamed Email",
       subject: email.subject || "",
       previewText: email.previewText || email.content?.previewText || "",
       htmlContent: extractedHtml,
-      plainTextContent: email.content?.plainText || email.content?.plaintext || "",
-      webversionUrl: email.publishedUrl || email.url || email.absoluteUrl || null,
+      plainTextContent:
+        email.content?.plainText || email.content?.plaintext || "",
+      webversionUrl:
+        email.publishedUrl || email.url || email.absoluteUrl || null,
       state: email.state || "DRAFT",
-      campaignName: email.campaign?.name || email.campaignName || email.campaign?.label || "",
+      campaignName:
+        email.campaign?.name ||
+        email.campaignName ||
+        email.campaign?.label ||
+        "",
       sendDate: email.publishDate || email.sendDate || null,
       createdAt: email.createdAt || "",
       updatedAt: email.updatedAt || "",

@@ -485,12 +485,13 @@ export async function registerRoutes(
   app.get("/api/hubspot/pipelines/:accountId", async (req, res) => {
     try {
       const { accountId } = req.params;
-      const account = await storage.getHubspotAccountById(accountId);
-      if (!account) {
-        return res.status(404).json({ error: "Account not found" });
+      const apiKey = await getApiKeyForAccount(accountId);
+      if (!apiKey) {
+        return res.status(400).json({ error: "Could not find API key for account" });
       }
 
-      const pipelines = await getDealPipelines(account.apiKey);
+      console.log(`Fetching pipelines for account ${accountId}...`);
+      const pipelines = await getDealPipelines(apiKey);
       res.json(pipelines);
     } catch (error) {
       console.error("Error fetching pipelines:", error);
