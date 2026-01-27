@@ -975,12 +975,7 @@ export async function getPipelineStages(
   const stageMap = new Map<string, { label: string; probability: number }>();
 
   try {
-    const httpResponse: any = await client.apiRequest({
-      method: "GET",
-      path: "/crm/v3/pipelines/deals",
-    });
-    
-    const response = await httpResponse.json();
+    const response: any = await client.crm.pipelines.pipelinesApi.getAll("deals");
 
     console.log(`Fetched ${response.results?.length || 0} pipelines`);
 
@@ -1016,12 +1011,7 @@ export async function getDealPipelines(
   const pipelines: { id: string; label: string; displayOrder: number; stages: { id: string; label: string }[] }[] = [];
 
   try {
-    const httpResponse: any = await client.apiRequest({
-      method: "GET",
-      path: "/crm/v3/pipelines/deals",
-    });
-    
-    const response = await httpResponse.json();
+    const response: any = await client.crm.pipelines.pipelinesApi.getAll("deals");
 
     for (const pipeline of response.results || []) {
       pipelines.push({
