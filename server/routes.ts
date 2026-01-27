@@ -1189,7 +1189,9 @@ export async function registerRoutes(
 
       // Load deal display settings to get pipeline filter
       const dealDisplaySettings = await storage.getDealDisplaySettings(hubspotAccountId);
-      const pipelineFilter = dealDisplaySettings?.selectedPipelines || [];
+      const pipelineFilter: string[] = Array.isArray(dealDisplaySettings?.selectedPipelines) 
+        ? dealDisplaySettings.selectedPipelines 
+        : [];
 
       // Use comprehensive data with pre-calculated summaries for the specified year
       const hubspotData = await getComprehensiveData(apiKey, undefined, reportYear, pipelineFilter);
@@ -1364,7 +1366,9 @@ export async function registerRoutes(
         try {
           // Load deal display settings to get pipeline filter
           const dealDisplaySettings = await storage.getDealDisplaySettings(hubspotAccountId);
-          const pipelineFilter = dealDisplaySettings?.selectedPipelines || [];
+          const pipelineFilter: string[] = Array.isArray(dealDisplaySettings?.selectedPipelines) 
+            ? dealDisplaySettings.selectedPipelines 
+            : [];
           hubspotData = await getComprehensiveData(apiKey, undefined, year || new Date().getFullYear(), pipelineFilter);
         } catch (err) {
           // Silent catch for HubSpot data errors in Q&A

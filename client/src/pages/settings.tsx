@@ -1496,9 +1496,23 @@ export default function SettingsPage() {
                         <div className="text-center py-6 text-muted-foreground bg-muted/30 rounded-lg">
                           <Briefcase className="w-8 h-8 mx-auto mb-2 opacity-50" />
                           <p className="text-sm">No pipelines found</p>
-                          <p className="text-xs">
+                          <p className="text-xs mb-3">
                             Click Refresh to load pipelines from HubSpot
                           </p>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={loadPipelines}
+                            disabled={isLoadingPipelines}
+                            data-testid="button-refresh-pipelines-empty"
+                          >
+                            {isLoadingPipelines ? (
+                              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                            ) : (
+                              <RefreshCw className="w-4 h-4 mr-2" />
+                            )}
+                            Refresh Pipelines
+                          </Button>
                         </div>
                       ) : (
                         <div className="space-y-2 max-h-[200px] overflow-y-auto border rounded-lg p-3">
