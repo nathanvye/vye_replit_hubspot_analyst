@@ -634,6 +634,93 @@ export async function registerRoutes(
     }
   });
 
+  // Get MQL/SQL counts by quarter based on lifecycle stage settings
+  app.get("/api/mql-sql-counts/:accountId", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const year = parseInt(req.query.year as string) || new Date().getFullYear();
+      
+      const apiKey = await getApiKeyForAccount(accountId);
+      if (!apiKey) {
+        return res.status(400).json({ error: "HubSpot account not configured" });
+      }
+      
+      const lifecycleSettings = await storage.getLifecycleStageSettings(accountId);
+      if (!lifecycleSettings?.mqlStage && !lifecycleSettings?.sqlStage) {
+        return res.json({
+          mql: { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 },
+          sql: { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 },
+          conversionRate: { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 },
+          settings: { mqlStage: null, sqlStage: null }
+        });
+      }
+      
+      const lifecycleData = await getLifecycleStageBreakdown(apiKey, year);
+      
+      const stageKeyToLabel: Record<string, string> = {
+        "subscriber": "Subscriber",
+        "lead": "Lead", 
+        "marketingqualifiedlead": "Marketing Qualified Lead",
+        "salesqualifiedlead": "Sales Qualified Lead",
+        "opportunity": "Opportunity",
+        "customer": "Customer",
+        "evangelist": "Evangelist",
+        "other": "Other"
+      };
+      
+      const mqlLabel = lifecycleSettings.mqlStage ? stageKeyToLabel[lifecycleSettings.mqlStage] : null;
+      const sqlLabel = lifecycleSettings.sqlStage ? stageKeyToLabel[lifecycleSettings.sqlStage] : null;
+      
+      if (lifecycleSettings.mqlStage && !mqlLabel) {
+        console.warn(`MQL stage "${lifecycleSettings.mqlStage}" not found in stageKeyToLabel mapping`);
+      }
+      if (lifecycleSettings.sqlStage && !sqlLabel) {
+        console.warn(`SQL stage "${lifecycleSettings.sqlStage}" not found in stageKeyToLabel mapping`);
+      }
+      
+      const mqlCounts = mqlLabel && lifecycleData.quarterlyBecame[mqlLabel] 
+        ? lifecycleData.quarterlyBecame[mqlLabel] 
+        : { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
+        
+      const sqlCounts = sqlLabel && lifecycleData.quarterlyBecame[sqlLabel]
+        ? lifecycleData.quarterlyBecame[sqlLabel]
+        : { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
+        
+      if (mqlLabel && !lifecycleData.quarterlyBecame[mqlLabel]) {
+        console.warn(`MQL label "${mqlLabel}" not found in lifecycleData.quarterlyBecame`);
+      }
+      if (sqlLabel && !lifecycleData.quarterlyBecame[sqlLabel]) {
+        console.warn(`SQL label "${sqlLabel}" not found in lifecycleData.quarterlyBecame`);
+      }
+      
+      const calculateConversionRate = (sql: number, mql: number): number => {
+        if (mql === 0) return 0;
+        return Math.round((sql / mql) * 100);
+      };
+      
+      const conversionRate = {
+        Q1: calculateConversionRate(sqlCounts.Q1, mqlCounts.Q1),
+        Q2: calculateConversionRate(sqlCounts.Q2, mqlCounts.Q2),
+        Q3: calculateConversionRate(sqlCounts.Q3, mqlCounts.Q3),
+        Q4: calculateConversionRate(sqlCounts.Q4, mqlCounts.Q4),
+        total: calculateConversionRate(sqlCounts.total, mqlCounts.total)
+      };
+      
+      res.json({
+        mql: mqlCounts,
+        sql: sqlCounts,
+        conversionRate,
+        settings: {
+          mqlStage: lifecycleSettings.mqlStage,
+          sqlStage: lifecycleSettings.sqlStage
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching MQL/SQL counts:", error);
+      res.status(500).json({ error: "Failed to fetch MQL/SQL counts" });
+    }
+  });
+
   // ==========================================
   // Google Analytics
   // ==========================================

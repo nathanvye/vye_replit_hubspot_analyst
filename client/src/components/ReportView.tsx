@@ -206,6 +206,26 @@ export function ReportView() {
     enabled: !!selectedAccount,
   });
 
+  const { data: lifecycleSettings } = useQuery<{ mqlStage: string | null; sqlStage: string | null }>({
+    queryKey: [`/api/lifecycle-stage-settings/${selectedAccount}`],
+    enabled: !!selectedAccount,
+  });
+
+  const { data: mqlSqlData } = useQuery<{
+    mql: { Q1: number; Q2: number; Q3: number; Q4: number; total: number };
+    sql: { Q1: number; Q2: number; Q3: number; Q4: number; total: number };
+    conversionRate: { Q1: number; Q2: number; Q3: number; Q4: number; total: number };
+    settings: { mqlStage: string | null; sqlStage: string | null };
+  }>({
+    queryKey: [`/api/mql-sql-counts/${selectedAccount}`, report?.kpiTable?.year || currentYear, lifecycleSettings?.mqlStage, lifecycleSettings?.sqlStage],
+    queryFn: async () => {
+      const response = await fetch(`/api/mql-sql-counts/${selectedAccount}?year=${report?.kpiTable?.year || currentYear}`);
+      if (!response.ok) throw new Error('Failed to fetch MQL/SQL data');
+      return response.json();
+    },
+    enabled: !!selectedAccount && !!report,
+  });
+
   const enrichedKpiRows = (report?.kpiTable?.rows || [])
     .map(row => {
     // Find goal for this specific metric and year
@@ -434,6 +454,7 @@ export function ReportView() {
             year={report.kpiTable?.year}
             formSubmissions={report.formSubmissions}
             hubspotLists={report.hubspotLists}
+            mqlSqlData={mqlSqlData}
           />
         ) : verified && (
           <Card className="overflow-hidden border-border/60 shadow-sm">

@@ -42,14 +42,22 @@ interface HubSpotListData {
   memberCount: number;
 }
 
+interface MqlSqlData {
+  mql: { Q1: number; Q2: number; Q3: number; Q4: number; total: number };
+  sql: { Q1: number; Q2: number; Q3: number; Q4: number; total: number };
+  conversionRate: { Q1: number; Q2: number; Q3: number; Q4: number; total: number };
+  settings: { mqlStage: string | null; sqlStage: string | null };
+}
+
 interface KPITableProps {
   rows: KPIRow[];
   year?: number;
   formSubmissions?: FormSubmissionData[];
   hubspotLists?: HubSpotListData[];
+  mqlSqlData?: MqlSqlData;
 }
 
-export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists = [] }: KPITableProps) {
+export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists = [], mqlSqlData }: KPITableProps) {
   const formatValue = (value: number | string | null) => {
     if (value === null || value === undefined || value === '') return '-';
     if (typeof value === 'number') {
@@ -269,6 +277,46 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
               </tr>
             );
           })}
+          
+          {mqlSqlData && (mqlSqlData.settings.mqlStage || mqlSqlData.settings.sqlStage) && (
+            <tr 
+              className={cn(
+                "border-t border-border",
+                (rows.length + formSubmissions.length + hubspotLists.length) % 2 === 0 
+                  ? "bg-white dark:bg-slate-900" 
+                  : "bg-gray-50 dark:bg-slate-800"
+              )}
+              data-testid="row-mql-sql"
+            >
+              <td className="px-3 py-3 text-left">
+                <div className="text-[#5C3D5E] font-semibold" data-testid="text-mql-sql-metric">
+                  MQLs | SQLs | (%)
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Lifecycle stage conversions
+                </div>
+              </td>
+              <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+              <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold" data-testid="text-mql-sql-q1">
+                {formatValue(mqlSqlData.mql.Q1)} | {formatValue(mqlSqlData.sql.Q1)} | {mqlSqlData.conversionRate.Q1}%
+              </td>
+              <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+              <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold" data-testid="text-mql-sql-q2">
+                {formatValue(mqlSqlData.mql.Q2)} | {formatValue(mqlSqlData.sql.Q2)} | {mqlSqlData.conversionRate.Q2}%
+              </td>
+              <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+              <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold" data-testid="text-mql-sql-q3">
+                {formatValue(mqlSqlData.mql.Q3)} | {formatValue(mqlSqlData.sql.Q3)} | {mqlSqlData.conversionRate.Q3}%
+              </td>
+              <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+              <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold" data-testid="text-mql-sql-q4">
+                {formatValue(mqlSqlData.mql.Q4)} | {formatValue(mqlSqlData.sql.Q4)} | {mqlSqlData.conversionRate.Q4}%
+              </td>
+              <td className="px-3 py-3 text-center bg-green-100 dark:bg-green-900/30 font-semibold" data-testid="text-mql-sql-total">
+                {formatValue(mqlSqlData.mql.total)} | {formatValue(mqlSqlData.sql.total)} | {mqlSqlData.conversionRate.total}%
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
