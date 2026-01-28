@@ -1519,42 +1519,13 @@ export default function SettingsPage() {
                       Deal Display Settings
                     </CardTitle>
                     <CardDescription>
-                      Configure which deals and pipelines to show in reports.
+                      Configure MQL and SQL lifecycle stages for report tracking.
                     </CardDescription>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={loadPipelines}
-                    disabled={isLoadingPipelines}
-                    data-testid="button-refresh-pipelines"
-                  >
-                    <RefreshCw
-                      className={`w-4 h-4 mr-2 ${isLoadingPipelines ? "animate-spin" : ""}`}
-                    />
-                    Refresh
-                  </Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
-                  <div className="space-y-1">
-                    <Label htmlFor="show-new-deals" className="font-medium">
-                      Show New Deals in Reports
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      Include new deals metrics in the KPI table.
-                    </p>
-                  </div>
-                  <Switch
-                    id="show-new-deals"
-                    checked={showNewDeals}
-                    onCheckedChange={setShowNewDeals}
-                    data-testid="switch-show-new-deals"
-                  />
-                </div>
-
-                <div className="space-y-6 pt-2">
+                <div className="space-y-6">
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -1639,97 +1610,6 @@ export default function SettingsPage() {
                       </Button>
                     </div>
                   </div>
-
-                  <div className="border-t pt-4" />
-                </div>
-
-                {showNewDeals && (
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="text-sm font-medium mb-3 block">
-                        Select Pipelines to Show
-                      </Label>
-                      <p className="text-xs text-muted-foreground mb-3">
-                        Choose which pipelines to include in the New Deals row.
-                        If none selected, all deals will be shown.
-                      </p>
-
-                      {isLoadingPipelines ? (
-                        <div className="flex items-center justify-center py-8">
-                          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                        </div>
-                      ) : availablePipelines.length === 0 ? (
-                        <div className="text-center py-6 text-muted-foreground bg-muted/30 rounded-lg">
-                          <Briefcase className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                          <p className="text-sm">No pipelines found</p>
-                          <p className="text-xs mb-3">
-                            Click Refresh to load pipelines from HubSpot
-                          </p>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={loadPipelines}
-                            disabled={isLoadingPipelines}
-                            data-testid="button-refresh-pipelines-empty"
-                          >
-                            {isLoadingPipelines ? (
-                              <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                            ) : (
-                              <RefreshCw className="w-4 h-4 mr-2" />
-                            )}
-                            Refresh Pipelines
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="space-y-2 max-h-[200px] overflow-y-auto border rounded-lg p-3">
-                          {availablePipelines.map((pipeline) => (
-                            <div
-                              key={pipeline.id}
-                              className="flex items-center space-x-3 p-2 hover:bg-muted/30 rounded"
-                            >
-                              <Checkbox
-                                id={`pipeline-${pipeline.id}`}
-                                checked={selectedPipelines.includes(
-                                  pipeline.id,
-                                )}
-                                onCheckedChange={() =>
-                                  handlePipelineToggle(pipeline.id)
-                                }
-                                data-testid={`checkbox-pipeline-${pipeline.id}`}
-                              />
-                              <label
-                                htmlFor={`pipeline-${pipeline.id}`}
-                                className="text-sm font-medium cursor-pointer flex-1"
-                              >
-                                {pipeline.label}
-                              </label>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {selectedPipelines.length > 0 && (
-                      <div className="text-xs text-muted-foreground">
-                        {selectedPipelines.length} pipeline(s) selected
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex justify-end pt-2">
-                  <Button
-                    onClick={handleSaveDealDisplaySettings}
-                    disabled={isSavingDealSettings}
-                    data-testid="button-save-deal-settings"
-                  >
-                    {isSavingDealSettings ? (
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    ) : (
-                      <Save className="w-4 h-4 mr-2" />
-                    )}
-                    Save Settings
-                  </Button>
                 </div>
               </CardContent>
             </Card>
