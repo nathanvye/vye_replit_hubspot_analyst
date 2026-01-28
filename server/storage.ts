@@ -104,9 +104,29 @@ export interface IStorage {
   // Lifecycle Stage Settings
   getLifecycleStageSettings(hubspotAccountId: string): Promise<LifecycleStageSettings | undefined>;
   upsertLifecycleStageSettings(settings: InsertLifecycleStageSettings): Promise<LifecycleStageSettings>;
+  getCache?(key: string): Promise<any>;
+  setCache?(key: string, value: any, ttlSeconds?: number): Promise<void>;
 }
 
 class Storage implements IStorage {
+  private cache: Map<string, { value: any, expires: number }> = new Map();
+
+  async getCache(key: string): Promise<any> {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expires) {
+      this.cache.delete(key);
+      return null;
+    }
+    return entry.value;
+  }
+
+  async setCache(key: string, value: any, ttlSeconds: number = 3600): Promise<void> {
+    this.cache.set(key, {
+      value,
+      expires: Date.now() + (ttlSeconds * 1000)
+    });
+  }
   // Users
   async getUserByEmail(email: string): Promise<User | undefined> {
     const result = await db.select().from(schema.users).where(eq(schema.users.email, email)).limit(1);
