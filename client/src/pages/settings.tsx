@@ -2152,6 +2152,7 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
+{/* 
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -2661,6 +2662,8 @@ export default function SettingsPage() {
                 )}
               </CardContent>
             </Card>
+            */}
+            */}
           </div>
         </ScrollArea>
       </main>
