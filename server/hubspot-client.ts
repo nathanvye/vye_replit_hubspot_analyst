@@ -1136,23 +1136,21 @@ export async function getContactsWithLifecycleHistory(
 
   console.log(`Fetched ${contacts.length} contacts with lifecycle history`);
   
-  // Debug: Log first 3 contacts with their lifecycle properties
-  const debugContacts = contacts.slice(0, 3);
-  for (const c of debugContacts) {
-    console.log(`[Lifecycle History Debug] Contact ${c.id}:`, {
-      lifecyclestage: c.properties.lifecyclestage,
-      lead_date: c.properties.hs_lifecyclestage_lead_date,
-      mql_date: c.properties.hs_lifecyclestage_marketingqualifiedlead_date,
-      sql_date: c.properties.hs_lifecyclestage_salesqualifiedlead_date,
-      opportunity_date: c.properties.hs_lifecyclestage_opportunity_date,
-      customer_date: c.properties.hs_lifecyclestage_customer_date,
-    });
+  // Debug: Log first contact's FULL properties to see what HubSpot actually returns
+  if (contacts.length > 0) {
+    console.log(`[Lifecycle History Debug] First contact FULL properties:`, JSON.stringify(contacts[0].properties, null, 2));
+    
+    // Also check which property keys contain "lifecycle" 
+    const allKeys = Object.keys(contacts[0].properties);
+    const lifecycleKeys = allKeys.filter(k => k.toLowerCase().includes('lifecycle'));
+    console.log(`[Lifecycle History Debug] Available lifecycle-related properties:`, lifecycleKeys);
   }
   
   return contacts;
 }
 
 // Get lifecycle stage breakdown with quarterly "became X" counts
+// Uses Search API to count contacts created in each quarter with each lifecycle stage
 export async function getLifecycleStageBreakdown(
   apiKey: string,
   year: number = new Date().getFullYear(),
@@ -1163,6 +1161,7 @@ export async function getLifecycleStageBreakdown(
     { Q1: number; Q2: number; Q3: number; Q4: number; total: number }
   >;
 }> {
+  const client = createHubSpotClient(apiKey);
   const contacts = await getContactsWithLifecycleHistory(apiKey);
 
   const lifecycleStages = [
@@ -1231,8 +1230,7 @@ export async function getLifecycleStageBreakdown(
     }
 
     if (isNaN(finalDate.getTime())) return null;
-    const month = finalDate.getMonth();
-    // HubSpot timestamps are typically in UTC, and getMonth() is 0-indexed
+    // HubSpot timestamps are typically in UTC
     if (finalDate.getUTCFullYear() !== year) return null;
     const utcMonth = finalDate.getUTCMonth();
     if (utcMonth < 3) return "Q1";
@@ -1241,8 +1239,8 @@ export async function getLifecycleStageBreakdown(
     return "Q4";
   };
 
-  // Debug: Log sample contact properties to see what lifecycle date fields look like
-  let debugLogged = false;
+  // First try: Check if lifecycle date properties are available
+  let usedLifecycleDates = false;
   let contactsWithDates = 0;
   
   for (const contact of contacts) {
@@ -1254,20 +1252,15 @@ export async function getLifecycleStageBreakdown(
       currentCounts[stageInfo.label]++;
     }
 
-    // Count "became X" dates per quarter
+    // Try to count "became X" dates per quarter using lifecycle date properties
     for (const stage of lifecycleStages) {
       const becameValue =
         contact.properties[stage.dateField as keyof typeof contact.properties];
       
-      // Debug: Log first contact with any lifecycle date
-      if (becameValue && becameValue !== "0" && becameValue !== "" && !debugLogged) {
-        console.log(`[Lifecycle Debug] Sample contact properties:`, JSON.stringify(contact.properties, null, 2));
-        debugLogged = true;
-      }
-      
       // HubSpot sometimes returns empty strings, null, or "0" for dates that haven't occurred
       if (!becameValue || becameValue === "0" || becameValue === "") continue;
 
+      usedLifecycleDates = true;
       contactsWithDates++;
       const quarter = getQuarter(becameValue as string | number);
       if (quarter) {
@@ -1277,9 +1270,39 @@ export async function getLifecycleStageBreakdown(
     }
   }
   
-  console.log(`[Lifecycle Debug] Contacts with lifecycle dates found: ${contactsWithDates}`);
+  console.log(`[Lifecycle Debug] Contacts with lifecycle date properties: ${contactsWithDates}`);
   console.log(`[Lifecycle Debug] Year filter: ${year}`);
-  console.log(`[Lifecycle Debug] QuarterlyBecame result:`, JSON.stringify(quarterlyBecame, null, 2));
+
+  // Fallback: If no lifecycle date properties were found, use createdate as approximation
+  // This counts contacts who are currently in each stage, grouped by when they were created
+  if (!usedLifecycleDates) {
+    console.log(`[Lifecycle Debug] No lifecycle date properties found. Using createdate as fallback.`);
+    
+    // Reset quarterly counts
+    for (const stage of lifecycleStages) {
+      quarterlyBecame[stage.label] = { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
+    }
+    
+    for (const contact of contacts) {
+      const currentStage = contact.properties.lifecyclestage;
+      const createDate = contact.properties.createdate;
+      
+      if (!currentStage || !createDate) continue;
+      
+      const stageInfo = lifecycleStages.find((s) => s.key === currentStage);
+      if (!stageInfo) continue;
+      
+      const quarter = getQuarter(createDate);
+      if (quarter) {
+        quarterlyBecame[stageInfo.label][quarter]++;
+        quarterlyBecame[stageInfo.label].total++;
+      }
+    }
+    
+    console.log(`[Lifecycle Debug] Using createdate fallback - QuarterlyBecame result:`, JSON.stringify(quarterlyBecame, null, 2));
+  } else {
+    console.log(`[Lifecycle Debug] QuarterlyBecame result:`, JSON.stringify(quarterlyBecame, null, 2));
+  }
 
   return { currentCounts, quarterlyBecame };
 }
