@@ -1217,11 +1217,13 @@ export async function getLifecycleStageBreakdown(
     }
 
     if (isNaN(finalDate.getTime())) return null;
-    if (finalDate.getFullYear() !== year) return null;
     const month = finalDate.getMonth();
-    if (month < 3) return "Q1";
-    if (month < 6) return "Q2";
-    if (month < 9) return "Q3";
+    // HubSpot timestamps are typically in UTC, and getMonth() is 0-indexed
+    if (finalDate.getUTCFullYear() !== year) return null;
+    const utcMonth = finalDate.getUTCMonth();
+    if (utcMonth < 3) return "Q1";
+    if (utcMonth < 6) return "Q2";
+    if (utcMonth < 9) return "Q3";
     return "Q4";
   };
 

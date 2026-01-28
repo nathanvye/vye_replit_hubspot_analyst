@@ -30,7 +30,7 @@ export function LifecycleStagesTable({ data, year }: LifecycleStagesTableProps) 
 
   const stages = STAGE_ORDER.filter(stage => {
     const hasCurrentCount = (data.currentCounts?.[stage] || 0) > 0;
-    const hasQuarterlyData = data.quarterlyBecame?.[stage]?.total > 0;
+    const hasQuarterlyData = data.quarterlyBecame?.[stage]?.total >= 0;
     return hasCurrentCount || hasQuarterlyData;
   });
 
@@ -72,16 +72,16 @@ export function LifecycleStagesTable({ data, year }: LifecycleStagesTableProps) 
                       {current.toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {quarterly.Q1 > 0 ? quarterly.Q1.toLocaleString() : '-'}
+                      {quarterly.Q1.toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {quarterly.Q2 > 0 ? quarterly.Q2.toLocaleString() : '-'}
+                      {quarterly.Q2.toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {quarterly.Q3 > 0 ? quarterly.Q3.toLocaleString() : '-'}
+                      {quarterly.Q3.toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {quarterly.Q4 > 0 ? quarterly.Q4.toLocaleString() : '-'}
+                      {quarterly.Q4.toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right font-mono font-bold text-[#5C3D5E]">
                       {quarterly.total.toLocaleString()}
