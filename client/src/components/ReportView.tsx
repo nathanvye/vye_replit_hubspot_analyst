@@ -227,6 +227,7 @@ export function ReportView() {
   });
 
   const enrichedKpiRows = (report?.kpiTable?.rows || [])
+    .filter(row => row.metric !== "MQLs" && row.metric !== "SQLs")
     .map(row => {
     // Find goal for this specific metric and year
     // Handle "New Contacts" vs "Contacts" naming discrepancy
