@@ -1787,27 +1787,24 @@ export interface LifecycleStageOption {
   value: string;
 }
 
-export async function getLifecycleStageOptions(apiKey: string): Promise<LifecycleStageOption[]> {
-  try {
-    const client = createHubSpotClient(apiKey);
-    const response: any = await client.apiRequest({
-      method: "GET",
-      path: "/crm/v3/properties/contacts/lifecyclestage",
-    });
+export async function getLifecycleStageOptions(
+  apiKey: string,
+): Promise<{ label: string; value: string }[]> {
+  const client = createHubSpotClient(apiKey);
 
-    if (response?.options && Array.isArray(response.options)) {
-      return response.options.map((option: any) => ({
-        label: option.label || option.value,
-        value: option.value,
-      }));
-    }
+  const response = await client.crm.properties.coreApi.getByName(
+    "contacts",
+    "lifecyclestage",
+  );
 
+  const options = response.options;
+
+  if (!Array.isArray(options)) {
     return [];
-  } catch (error: any) {
-    console.error(
-      "Error fetching lifecycle stage options:",
-      error.body?.message || error.message,
-    );
-    throw error;
   }
+
+  return options.map((option) => ({
+    label: option.label ?? option.value,
+    value: option.value,
+  }));
 }
