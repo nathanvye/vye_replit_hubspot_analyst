@@ -655,7 +655,14 @@ export async function registerRoutes(
         });
       }
       
-      const lifecycleData = await getLifecycleStageBreakdown(apiKey, year);
+      // Use cache for lifecycle data to speed up subsequent requests
+      const cacheKey = `lifecycle_${accountId}_${year}`;
+      let lifecycleData = await storage.getCache?.(cacheKey);
+      
+      if (!lifecycleData) {
+        lifecycleData = await getLifecycleStageBreakdown(apiKey, year);
+        await storage.setCache?.(cacheKey, lifecycleData, 3600); // Cache for 1 hour
+      }
       
       const stageKeyToLabel: Record<string, string> = {
         "subscriber": "Subscriber",

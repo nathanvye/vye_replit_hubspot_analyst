@@ -355,7 +355,7 @@ export function ReportView() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
           <div>
             <h1 className="text-3xl font-display font-bold text-foreground" data-testid="text-report-title">
-              {report.title}
+              Jan - Dec {report.kpiTable?.year || selectedYear} Report
             </h1>
             <p className="text-xl text-muted-foreground">{report.subtitle}</p>
           </div>

@@ -298,22 +298,52 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
               </td>
               <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
               <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold" data-testid="text-mql-sql-q1">
-                {formatValue(mqlSqlData.mql.Q1)} | {formatValue(mqlSqlData.sql.Q1)} | {mqlSqlData.conversionRate.Q1}%
+                {mqlSqlData.mql.Q1 !== undefined ? (
+                  `${formatValue(mqlSqlData.mql.Q1)} | ${formatValue(mqlSqlData.sql.Q1)} | ${mqlSqlData.conversionRate.Q1}%`
+                ) : (
+                  <div className="flex items-center justify-center">
+                    <div className="w-4 h-4 border-2 border-[#5C3D5E] border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
               </td>
               <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
               <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold" data-testid="text-mql-sql-q2">
-                {formatValue(mqlSqlData.mql.Q2)} | {formatValue(mqlSqlData.sql.Q2)} | {mqlSqlData.conversionRate.Q2}%
+                {mqlSqlData.mql.Q2 !== undefined ? (
+                  `${formatValue(mqlSqlData.mql.Q2)} | ${formatValue(mqlSqlData.sql.Q2)} | ${mqlSqlData.conversionRate.Q2}%`
+                ) : (
+                  <div className="flex items-center justify-center">
+                    <div className="w-4 h-4 border-2 border-[#5C3D5E] border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
               </td>
               <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
               <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold" data-testid="text-mql-sql-q3">
-                {formatValue(mqlSqlData.mql.Q3)} | {formatValue(mqlSqlData.sql.Q3)} | {mqlSqlData.conversionRate.Q3}%
+                {mqlSqlData.mql.Q3 !== undefined ? (
+                  `${formatValue(mqlSqlData.mql.Q3)} | ${formatValue(mqlSqlData.sql.Q3)} | ${mqlSqlData.conversionRate.Q3}%`
+                ) : (
+                  <div className="flex items-center justify-center">
+                    <div className="w-4 h-4 border-2 border-[#5C3D5E] border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
               </td>
               <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
               <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold" data-testid="text-mql-sql-q4">
-                {formatValue(mqlSqlData.mql.Q4)} | {formatValue(mqlSqlData.sql.Q4)} | {mqlSqlData.conversionRate.Q4}%
+                {mqlSqlData.mql.Q4 !== undefined ? (
+                  `${formatValue(mqlSqlData.mql.Q4)} | ${formatValue(mqlSqlData.sql.Q4)} | ${mqlSqlData.conversionRate.Q4}%`
+                ) : (
+                  <div className="flex items-center justify-center">
+                    <div className="w-4 h-4 border-2 border-[#5C3D5E] border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
               </td>
               <td className="px-3 py-3 text-center bg-green-100 dark:bg-green-900/30 font-semibold" data-testid="text-mql-sql-total">
-                {formatValue(mqlSqlData.mql.total)} | {formatValue(mqlSqlData.sql.total)} | {mqlSqlData.conversionRate.total}%
+                {mqlSqlData.mql.total !== undefined ? (
+                  `${formatValue(mqlSqlData.mql.total)} | ${formatValue(mqlSqlData.sql.total)} | ${mqlSqlData.conversionRate.total}%`
+                ) : (
+                  <div className="flex items-center justify-center">
+                    <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
               </td>
             </tr>
           )}
