@@ -249,6 +249,34 @@ export function ReportView() {
     return row;
   });
 
+  const enrichedMqlSqlData = mqlSqlData ? {
+    ...mqlSqlData,
+    mqlGoals: (() => {
+      const mqlGoals = kpiGoals?.find(g => 
+        g.metric.toLowerCase() === 'mqls' && 
+        g.year === (report?.kpiTable?.year || currentYear)
+      );
+      return mqlGoals ? {
+        q1Goal: mqlGoals.q1Goal || 0,
+        q2Goal: mqlGoals.q2Goal || 0,
+        q3Goal: mqlGoals.q3Goal || 0,
+        q4Goal: mqlGoals.q4Goal || 0,
+      } : undefined;
+    })(),
+    sqlGoals: (() => {
+      const sqlGoals = kpiGoals?.find(g => 
+        g.metric.toLowerCase() === 'sqls' && 
+        g.year === (report?.kpiTable?.year || currentYear)
+      );
+      return sqlGoals ? {
+        q1Goal: sqlGoals.q1Goal || 0,
+        q2Goal: sqlGoals.q2Goal || 0,
+        q3Goal: sqlGoals.q3Goal || 0,
+        q4Goal: sqlGoals.q4Goal || 0,
+      } : undefined;
+    })(),
+  } : undefined;
+
   if (!report) {
     return (
       <div className="w-full max-w-3xl mx-auto p-6 md:p-10">
@@ -455,7 +483,7 @@ export function ReportView() {
             year={report.kpiTable?.year}
             formSubmissions={report.formSubmissions}
             hubspotLists={report.hubspotLists}
-            mqlSqlData={mqlSqlData}
+            mqlSqlData={enrichedMqlSqlData}
           />
         ) : verified && (
           <Card className="overflow-hidden border-border/60 shadow-sm">

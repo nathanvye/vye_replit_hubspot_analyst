@@ -47,6 +47,8 @@ interface MqlSqlData {
   sql: { Q1: number; Q2: number; Q3: number; Q4: number; total: number };
   conversionRate: { Q1: number; Q2: number; Q3: number; Q4: number; total: number };
   settings: { mqlStage: string | null; sqlStage: string | null };
+  mqlGoals?: { q1Goal?: number; q2Goal?: number; q3Goal?: number; q4Goal?: number };
+  sqlGoals?: { q1Goal?: number; q2Goal?: number; q3Goal?: number; q4Goal?: number };
 }
 
 interface KPITableProps {
@@ -296,7 +298,11 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
                   Lifecycle stage conversions
                 </div>
               </td>
-              <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+              <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20" data-testid="text-mql-sql-q1-goal">
+                {mqlSqlData.mqlGoals?.q1Goal !== undefined || mqlSqlData.sqlGoals?.q1Goal !== undefined ? (
+                  `${formatValue(mqlSqlData.mqlGoals?.q1Goal ?? 0)} | ${formatValue(mqlSqlData.sqlGoals?.q1Goal ?? 0)}`
+                ) : '-'}
+              </td>
               <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold" data-testid="text-mql-sql-q1">
                 {mqlSqlData.mql.Q1 !== undefined ? (
                   `${formatValue(mqlSqlData.mql.Q1)} | ${formatValue(mqlSqlData.sql.Q1)} | ${mqlSqlData.conversionRate.Q1}%`
@@ -306,7 +312,11 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
                   </div>
                 )}
               </td>
-              <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+              <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20" data-testid="text-mql-sql-q2-goal">
+                {mqlSqlData.mqlGoals?.q2Goal !== undefined || mqlSqlData.sqlGoals?.q2Goal !== undefined ? (
+                  `${formatValue(mqlSqlData.mqlGoals?.q2Goal ?? 0)} | ${formatValue(mqlSqlData.sqlGoals?.q2Goal ?? 0)}`
+                ) : '-'}
+              </td>
               <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold" data-testid="text-mql-sql-q2">
                 {mqlSqlData.mql.Q2 !== undefined ? (
                   `${formatValue(mqlSqlData.mql.Q2)} | ${formatValue(mqlSqlData.sql.Q2)} | ${mqlSqlData.conversionRate.Q2}%`
@@ -316,7 +326,11 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
                   </div>
                 )}
               </td>
-              <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+              <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20" data-testid="text-mql-sql-q3-goal">
+                {mqlSqlData.mqlGoals?.q3Goal !== undefined || mqlSqlData.sqlGoals?.q3Goal !== undefined ? (
+                  `${formatValue(mqlSqlData.mqlGoals?.q3Goal ?? 0)} | ${formatValue(mqlSqlData.sqlGoals?.q3Goal ?? 0)}`
+                ) : '-'}
+              </td>
               <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold" data-testid="text-mql-sql-q3">
                 {mqlSqlData.mql.Q3 !== undefined ? (
                   `${formatValue(mqlSqlData.mql.Q3)} | ${formatValue(mqlSqlData.sql.Q3)} | ${mqlSqlData.conversionRate.Q3}%`
@@ -326,7 +340,11 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
                   </div>
                 )}
               </td>
-              <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+              <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20" data-testid="text-mql-sql-q4-goal">
+                {mqlSqlData.mqlGoals?.q4Goal !== undefined || mqlSqlData.sqlGoals?.q4Goal !== undefined ? (
+                  `${formatValue(mqlSqlData.mqlGoals?.q4Goal ?? 0)} | ${formatValue(mqlSqlData.sqlGoals?.q4Goal ?? 0)}`
+                ) : '-'}
+              </td>
               <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold" data-testid="text-mql-sql-q4">
                 {mqlSqlData.mql.Q4 !== undefined ? (
                   `${formatValue(mqlSqlData.mql.Q4)} | ${formatValue(mqlSqlData.sql.Q4)} | ${mqlSqlData.conversionRate.Q4}%`
