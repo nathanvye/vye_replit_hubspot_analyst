@@ -210,7 +210,9 @@ const createKPITable = (rows: KPIRow[], year: number, formSubmissions: FormSubmi
     ],
   });
 
-  const dataRows = rows.map((row, idx) => {
+  const dataRows = rows
+    .filter((row) => row.metric !== "MQLs" && row.metric !== "SQLs")
+    .map((row, idx) => {
     const bgColor = idx % 2 === 0 ? "FFFFFF" : "F5F5F5";
     
     return new TableRow({
