@@ -127,6 +127,10 @@ export function ReportView() {
     try {
       const exportData = {
         ...report,
+        kpiTable: report.kpiTable ? {
+          ...report.kpiTable,
+          rows: enrichedKpiRows
+        } : undefined,
         mqlSqlData: enrichedMqlSqlData,
       };
       await exportReportToWord(exportData);

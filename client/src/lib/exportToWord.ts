@@ -262,25 +262,25 @@ const createKPITable = (rows: KPIRow[], year: number, formSubmissions: FormSubmi
         createDataCell(formatValue(row.q1.actual), { 
           bold: true, 
           bgColor: "E9D5FF",
-          color: row.q1Goal ? (Number(row.q1.actual) > row.q1Goal ? "16A34A" : Number(row.q1.actual) < row.q1Goal ? "991B1B" : "000000") : "000000"
+          color: row.q1Goal ? (Number(row.q1.actual) >= row.q1Goal ? "16A34A" : "991B1B") : "000000"
         }),
         createDataCell(row.q2Goal ? formatValue(row.q2Goal) : formatValue(row.q2.projection), { bgColor: "F3E8FF" }),
         createDataCell(formatValue(row.q2.actual), { 
           bold: true, 
           bgColor: "E9D5FF",
-          color: row.q2Goal ? (Number(row.q2.actual) > row.q2Goal ? "16A34A" : Number(row.q2.actual) < row.q2Goal ? "991B1B" : "000000") : "000000"
+          color: row.q2Goal ? (Number(row.q2.actual) >= row.q2Goal ? "16A34A" : "991B1B") : "000000"
         }),
         createDataCell(row.q3Goal ? formatValue(row.q3Goal) : formatValue(row.q3.projection), { bgColor: "F3E8FF" }),
         createDataCell(formatValue(row.q3.actual), { 
           bold: true, 
           bgColor: "E9D5FF",
-          color: row.q3Goal ? (Number(row.q3.actual) > row.q3Goal ? "16A34A" : Number(row.q3.actual) < row.q3Goal ? "991B1B" : "000000") : "000000"
+          color: row.q3Goal ? (Number(row.q3.actual) >= row.q3Goal ? "16A34A" : "991B1B") : "000000"
         }),
         createDataCell(row.q4Goal ? formatValue(row.q4Goal) : formatValue(row.q4.projection), { bgColor: "F3E8FF" }),
         createDataCell(formatValue(row.q4.actual), { 
           bold: true, 
           bgColor: "E9D5FF",
-          color: row.q4Goal ? (Number(row.q4.actual) > row.q4Goal ? "16A34A" : Number(row.q4.actual) < row.q4Goal ? "991B1B" : "000000") : "000000"
+          color: row.q4Goal ? (Number(row.q4.actual) >= row.q4Goal ? "16A34A" : "991B1B") : "000000"
         }),
         createDataCell(row.q1Goal || row.q2Goal || row.q3Goal || row.q4Goal 
           ? formatValue((row.q1Goal || 0) + (row.q2Goal || 0) + (row.q3Goal || 0) + (row.q4Goal || 0))
