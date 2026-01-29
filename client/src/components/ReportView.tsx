@@ -125,7 +125,11 @@ export function ReportView() {
     if (!report) return;
     setIsExporting(true);
     try {
-      await exportReportToWord(report);
+      const exportData = {
+        ...report,
+        mqlSqlData: enrichedMqlSqlData,
+      };
+      await exportReportToWord(exportData);
     } catch (err: any) {
       console.error("Export error:", err);
       setError("Failed to export report to Word");
@@ -223,7 +227,7 @@ export function ReportView() {
       if (!response.ok) throw new Error('Failed to fetch MQL/SQL data');
       return response.json();
     },
-    enabled: !!selectedAccount && !!lifecycleSettings?.mqlStage,
+    enabled: !!selectedAccount && !!(lifecycleSettings?.mqlStage || lifecycleSettings?.sqlStage),
   });
 
   const enrichedKpiRows = (report?.kpiTable?.rows || [])
@@ -376,7 +380,7 @@ export function ReportView() {
 
   const verified = report.verifiedData;
 
-  const shouldWaitForMqlSql = lifecycleSettings?.mqlStage && isMqlSqlLoading;
+  const shouldWaitForMqlSql = (lifecycleSettings?.mqlStage || lifecycleSettings?.sqlStage) && isMqlSqlLoading;
   
   if (shouldWaitForMqlSql) {
     return (

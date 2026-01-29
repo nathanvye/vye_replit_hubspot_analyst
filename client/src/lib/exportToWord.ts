@@ -56,6 +56,15 @@ interface HubSpotListData {
   memberCount: number;
 }
 
+interface MqlSqlData {
+  mql: { Q1: number; Q2: number; Q3: number; Q4: number; total: number };
+  sql: { Q1: number; Q2: number; Q3: number; Q4: number; total: number };
+  conversionRate: { Q1: number; Q2: number; Q3: number; Q4: number; total: number };
+  settings: { mqlStage: string | null; sqlStage: string | null };
+  mqlGoals?: { q1Goal?: number; q2Goal?: number; q3Goal?: number; q4Goal?: number };
+  sqlGoals?: { q1Goal?: number; q2Goal?: number; q3Goal?: number; q4Goal?: number };
+}
+
 interface ReportData {
   title: string;
   subtitle: string;
@@ -65,6 +74,7 @@ interface ReportData {
   };
   formSubmissions?: FormSubmissionData[];
   hubspotLists?: HubSpotListData[];
+  mqlSqlData?: MqlSqlData;
   dealsByStage?: { stage: string; count: number; value: number }[];
   dealsByOwner?: { owner: string; count: number; value: number }[];
   gaChannels?: any[];
@@ -183,7 +193,7 @@ const createDataCell = (
   });
 };
 
-const createKPITable = (rows: KPIRow[], year: number, formSubmissions: FormSubmissionData[] = [], hubspotLists: HubSpotListData[] = []): Table => {
+const createKPITable = (rows: KPIRow[], year: number, formSubmissions: FormSubmissionData[] = [], hubspotLists: HubSpotListData[] = [], mqlSqlData?: MqlSqlData): Table => {
   const headerRow = new TableRow({
     children: [
       createHeaderCell(""),
@@ -384,8 +394,64 @@ const createKPITable = (rows: KPIRow[], year: number, formSubmissions: FormSubmi
     });
   });
 
+  const mqlSqlRows: TableRow[] = [];
+  if (mqlSqlData) {
+    const rowIndex = rows.length + formSubmissions.length + hubspotLists.length;
+    const bgColor = rowIndex % 2 === 0 ? "FFFFFF" : "F5F5F5";
+    
+    const formatGoalCell = (mqlGoal?: number, sqlGoal?: number): string => {
+      if (mqlGoal !== undefined || sqlGoal !== undefined) {
+        return `${formatValue(mqlGoal ?? 0)} | ${formatValue(sqlGoal ?? 0)}`;
+      }
+      return "-";
+    };
+    
+    const formatActualCell = (mqlActual: number, sqlActual: number, convRate: number): string => {
+      return `${formatValue(mqlActual)} | ${formatValue(sqlActual)} | ${convRate}%`;
+    };
+    
+    mqlSqlRows.push(new TableRow({
+      children: [
+        new TableCell({
+          children: [
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "MQLs | SQLs | (%)",
+                  bold: true,
+                  color: PURPLE_COLOR,
+                  size: 18,
+                }),
+              ],
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Lifecycle stage conversions",
+                  size: 16,
+                  color: "666666",
+                }),
+              ],
+            }),
+          ],
+          shading: { type: ShadingType.SOLID, color: bgColor },
+        }),
+        createDataCell("-", { bold: true, bgColor }),
+        createDataCell(formatGoalCell(mqlSqlData.mqlGoals?.q1Goal, mqlSqlData.sqlGoals?.q1Goal), { bgColor: "F3E8FF" }),
+        createDataCell(formatActualCell(mqlSqlData.mql.Q1, mqlSqlData.sql.Q1, mqlSqlData.conversionRate.Q1), { bold: true, bgColor: "E9D5FF" }),
+        createDataCell(formatGoalCell(mqlSqlData.mqlGoals?.q2Goal, mqlSqlData.sqlGoals?.q2Goal), { bgColor: "F3E8FF" }),
+        createDataCell(formatActualCell(mqlSqlData.mql.Q2, mqlSqlData.sql.Q2, mqlSqlData.conversionRate.Q2), { bold: true, bgColor: "E9D5FF" }),
+        createDataCell(formatGoalCell(mqlSqlData.mqlGoals?.q3Goal, mqlSqlData.sqlGoals?.q3Goal), { bgColor: "F3E8FF" }),
+        createDataCell(formatActualCell(mqlSqlData.mql.Q3, mqlSqlData.sql.Q3, mqlSqlData.conversionRate.Q3), { bold: true, bgColor: "E9D5FF" }),
+        createDataCell(formatGoalCell(mqlSqlData.mqlGoals?.q4Goal, mqlSqlData.sqlGoals?.q4Goal), { bgColor: "F3E8FF" }),
+        createDataCell(formatActualCell(mqlSqlData.mql.Q4, mqlSqlData.sql.Q4, mqlSqlData.conversionRate.Q4), { bold: true, bgColor: "E9D5FF" }),
+        createDataCell(formatActualCell(mqlSqlData.mql.total, mqlSqlData.sql.total, mqlSqlData.conversionRate.total), { bold: true, bgColor: "D1FAE5" }),
+      ],
+    }));
+  }
+
   return new Table({
-    rows: [headerRow, ...dataRows, ...formRows, ...listRows],
+    rows: [headerRow, ...dataRows, ...formRows, ...listRows, ...mqlSqlRows],
     width: {
       size: 100,
       type: WidthType.PERCENTAGE,
@@ -661,7 +727,8 @@ export async function exportReportToWord(report: ReportData): Promise<void> {
         report.kpiTable.rows,
         report.kpiTable.year,
         report.formSubmissions || [],
-        report.hubspotLists || []
+        report.hubspotLists || [],
+        report.mqlSqlData
       )
     );
   } else if (report.verifiedData) {
