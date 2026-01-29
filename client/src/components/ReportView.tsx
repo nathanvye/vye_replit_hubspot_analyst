@@ -211,19 +211,19 @@ export function ReportView() {
     enabled: !!selectedAccount,
   });
 
-  const { data: mqlSqlData } = useQuery<{
+  const { data: mqlSqlData, isLoading: isMqlSqlLoading } = useQuery<{
     mql: { Q1: number; Q2: number; Q3: number; Q4: number; total: number };
     sql: { Q1: number; Q2: number; Q3: number; Q4: number; total: number };
     conversionRate: { Q1: number; Q2: number; Q3: number; Q4: number; total: number };
     settings: { mqlStage: string | null; sqlStage: string | null };
   }>({
-    queryKey: [`/api/mql-sql-counts/${selectedAccount}`, report?.kpiTable?.year || currentYear, lifecycleSettings?.mqlStage, lifecycleSettings?.sqlStage],
+    queryKey: [`/api/mql-sql-counts/${selectedAccount}`, selectedYear, lifecycleSettings?.mqlStage, lifecycleSettings?.sqlStage],
     queryFn: async () => {
-      const response = await fetch(`/api/mql-sql-counts/${selectedAccount}?year=${report?.kpiTable?.year || currentYear}`);
+      const response = await fetch(`/api/mql-sql-counts/${selectedAccount}?year=${selectedYear}`);
       if (!response.ok) throw new Error('Failed to fetch MQL/SQL data');
       return response.json();
     },
-    enabled: !!selectedAccount && !!report,
+    enabled: !!selectedAccount && !!lifecycleSettings?.mqlStage,
   });
 
   const enrichedKpiRows = (report?.kpiTable?.rows || [])
@@ -375,6 +375,28 @@ export function ReportView() {
   }
 
   const verified = report.verifiedData;
+
+  const shouldWaitForMqlSql = lifecycleSettings?.mqlStage && isMqlSqlLoading;
+  
+  if (shouldWaitForMqlSql) {
+    return (
+      <div className="w-full max-w-3xl mx-auto p-6 md:p-10">
+        <Card className="text-center py-12">
+          <CardContent className="space-y-6">
+            <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+              <RefreshCw className="w-8 h-8 text-primary animate-spin" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold mb-2">Loading Report Data</h2>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                Fetching MQL/SQL lifecycle data for {selectedYear}...
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-8 p-6 md:p-10 animate-in-up">
