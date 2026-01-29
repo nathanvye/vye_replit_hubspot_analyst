@@ -197,7 +197,6 @@ const createKPITable = (rows: KPIRow[], year: number, formSubmissions: FormSubmi
   const headerRow = new TableRow({
     children: [
       createHeaderCell(""),
-      createHeaderCell(`${year - 1} Year-End Projections`),
       createHeaderCell("Q1", DARK_PURPLE),
       createHeaderCell("Q1 Actuals", LIGHT_PURPLE),
       createHeaderCell("Q2", DARK_PURPLE),
@@ -259,7 +258,6 @@ const createKPITable = (rows: KPIRow[], year: number, formSubmissions: FormSubmi
           ],
           shading: { type: ShadingType.SOLID, color: bgColor },
         }),
-        createDataCell(formatValue(row.yearEndProjection), { bold: true, bgColor }),
         createDataCell(row.q1Goal ? formatValue(row.q1Goal) : formatValue(row.q1.projection), { bgColor: "F3E8FF" }),
         createDataCell(formatValue(row.q1.actual), { 
           bold: true, 
@@ -322,7 +320,6 @@ const createKPITable = (rows: KPIRow[], year: number, formSubmissions: FormSubmi
           ],
           shading: { type: ShadingType.SOLID, color: bgColor },
         }),
-        createDataCell("-", { bold: true, bgColor }),
         createDataCell(form.q1Goal ? formatValue(form.q1Goal) : "-", { bgColor: "F3E8FF" }),
         createDataCell(formatValue(form.Q1), { 
           bold: true, 
@@ -382,7 +379,6 @@ const createKPITable = (rows: KPIRow[], year: number, formSubmissions: FormSubmi
           ],
           shading: { type: ShadingType.SOLID, color: bgColor },
         }),
-        createDataCell("-", { bold: true, bgColor }),
         createDataCell("-", { bgColor: "F3E8FF" }),
         createDataCell("-", { bgColor: "E9D5FF" }),
         createDataCell("-", { bgColor: "F3E8FF" }),
@@ -438,7 +434,6 @@ const createKPITable = (rows: KPIRow[], year: number, formSubmissions: FormSubmi
           ],
           shading: { type: ShadingType.SOLID, color: bgColor },
         }),
-        createDataCell("-", { bold: true, bgColor }),
         createDataCell(formatGoalCell(mqlSqlData.mqlGoals?.q1Goal, mqlSqlData.sqlGoals?.q1Goal), { bgColor: "F3E8FF" }),
         createDataCell(formatActualCell(mqlSqlData.mql.Q1, mqlSqlData.sql.Q1, mqlSqlData.conversionRate.Q1), { bold: true, bgColor: "E9D5FF" }),
         createDataCell(formatGoalCell(mqlSqlData.mqlGoals?.q2Goal, mqlSqlData.sqlGoals?.q2Goal), { bgColor: "F3E8FF" }),
