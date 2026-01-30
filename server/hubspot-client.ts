@@ -728,9 +728,9 @@ export async function searchDeals(apiKey: string, filters: any) {
   return response.results;
 }
 
-// Fetch contacts that have a specific lifecycle stage date property set using HAS_PROPERTY filter
-// Then count how many fall within the quarter date range
-async function fetchContactsWithLifecycleDateProperty(
+// Count contacts that entered a lifecycle stage in a specific quarter using v2 date properties
+// Uses BETWEEN operator and returns total from response for efficiency
+async function countContactsInLifecycleDateRange(
   apiKey: string,
   propertyName: string,
   year: number,
@@ -739,20 +739,16 @@ async function fetchContactsWithLifecycleDateProperty(
   const client = createHubSpotClient(apiKey);
 
   const quarterRanges: Record<string, { start: number; end: number }> = {
-    Q1: { start: Date.UTC(year, 0, 1), end: Date.UTC(year, 3, 1) },
-    Q2: { start: Date.UTC(year, 3, 1), end: Date.UTC(year, 6, 1) },
-    Q3: { start: Date.UTC(year, 6, 1), end: Date.UTC(year, 9, 1) },
-    Q4: { start: Date.UTC(year, 9, 1), end: Date.UTC(year + 1, 0, 1) },
+    Q1: { start: Date.UTC(year, 0, 1), end: Date.UTC(year, 3, 1) - 1 },
+    Q2: { start: Date.UTC(year, 3, 1), end: Date.UTC(year, 6, 1) - 1 },
+    Q3: { start: Date.UTC(year, 6, 1), end: Date.UTC(year, 9, 1) - 1 },
+    Q4: { start: Date.UTC(year, 9, 1), end: Date.UTC(year + 1, 0, 1) - 1 },
   };
 
   const range = quarterRanges[quarter];
-  let count = 0;
-  let after: string | undefined;
   let retries = 0;
-  let debugLogged = false;
 
-  // First, search for contacts that have this property set
-  while (true) {
+  while (retries < 3) {
     try {
       const searchRequest: any = {
         filterGroups: [
@@ -760,95 +756,69 @@ async function fetchContactsWithLifecycleDateProperty(
             filters: [
               {
                 propertyName: propertyName,
-                operator: "HAS_PROPERTY",
+                operator: "BETWEEN",
+                value: String(range.start),
+                highValue: String(range.end),
               },
             ],
           },
         ],
-        properties: [propertyName],
-        limit: 100,
+        limit: 1, // We only need the total count, not the actual records
       };
 
-      if (after) searchRequest.after = after;
-
       const response = await client.crm.contacts.searchApi.doSearch(searchRequest);
-
-      if (!debugLogged && response.results && response.results.length > 0) {
-        console.log(`[MQL/SQL Debug] Found contacts with ${propertyName}. First result:`, JSON.stringify(response.results[0].properties, null, 2));
-        debugLogged = true;
-      }
-
-      // Count contacts whose date falls within the quarter
-      for (const contact of response.results || []) {
-        const dateStr = contact.properties?.[propertyName];
-        if (dateStr) {
-          const dateMs = new Date(dateStr).getTime();
-          if (dateMs >= range.start && dateMs < range.end) {
-            count++;
-          }
-        }
-      }
-
-      if (!response.paging?.next?.after) break;
-      after = response.paging.next.after;
-      retries = 0;
-
-      // Rate limit protection
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      const total = response.total || 0;
+      
+      console.log(`[MQL/SQL v2] ${propertyName} ${year} ${quarter}: ${total} contacts`);
+      return total;
     } catch (error: any) {
       if (error.code === 429 || error.response?.status === 429) {
-        if (retries >= 3) break;
         const delay = 1000 * Math.pow(2, retries);
         console.log(`Rate limited, waiting ${delay}ms...`);
         await new Promise((resolve) => setTimeout(resolve, delay));
         retries++;
         continue;
       }
-      // If the property doesn't exist or we can't search on it, return 0
-      console.warn(`Error searching for ${propertyName}:`, error.body?.message || error.message);
+      console.warn(`Error counting ${propertyName} for ${quarter}:`, error.body?.message || error.message);
       return 0;
     }
   }
 
-  return count;
+  return 0;
 }
 
-// Count SQLs that entered in a specific quarter using HAS_PROPERTY search
+// Count SQLs that entered in a specific quarter using v2 date property
 export async function getSQLsEnteredInQuarter(
   apiKey: string,
   year: number,
   quarter: "Q1" | "Q2" | "Q3" | "Q4",
 ): Promise<number> {
   try {
-    const count = await fetchContactsWithLifecycleDateProperty(
+    return await countContactsInLifecycleDateRange(
       apiKey,
-      "hs_lifecyclestage_salesqualifiedlead_date",
+      "hs_v2_date_entered_salesqualifiedlead",
       year,
       quarter
     );
-    console.log(`SQLs in ${year} ${quarter}: ${count}`);
-    return count;
   } catch (error: any) {
     console.warn(`getSQLsEnteredInQuarter ${quarter} failed (returning 0):`, error.message);
     return 0;
   }
 }
 
-// Count MQLs that entered in a specific quarter using HAS_PROPERTY search
+// Count MQLs that entered in a specific quarter using v2 date property
 export async function getMQLsEnteredInQuarter(
   apiKey: string,
   year: number,
   quarter: "Q1" | "Q2" | "Q3" | "Q4",
 ): Promise<number> {
   try {
-    const count = await fetchContactsWithLifecycleDateProperty(
+    return await countContactsInLifecycleDateRange(
       apiKey,
-      "hs_lifecyclestage_marketingqualifiedlead_date",
+      "hs_v2_date_entered_marketingqualifiedlead",
       year,
       quarter
     );
-    console.log(`MQLs in ${year} ${quarter}: ${count}`);
-    return count;
   } catch (error: any) {
     console.warn(`getMQLsEnteredInQuarter ${quarter} failed (returning 0):`, error.message);
     return 0;
