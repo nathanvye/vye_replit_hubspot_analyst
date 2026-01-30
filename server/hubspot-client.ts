@@ -728,6 +728,33 @@ export async function searchDeals(apiKey: string, filters: any) {
   return response.results;
 }
 
+// Get all available lifecycle stage date properties from HubSpot
+async function getLifecycleDateProperties(apiKey: string): Promise<string[]> {
+  const client = createHubSpotClient(apiKey);
+  const lifecycleDateProps: string[] = [];
+
+  try {
+    const httpResponse: any = await client.apiRequest({
+      method: "GET",
+      path: "/crm/v3/properties/contacts",
+    });
+    const response = await httpResponse.json();
+
+    for (const prop of response.results || []) {
+      // Look for any property containing "lifecyclestage" and "date"
+      if (prop.name && prop.name.toLowerCase().includes("lifecyclestage") && prop.name.toLowerCase().includes("date")) {
+        lifecycleDateProps.push(prop.name);
+      }
+    }
+
+    console.log("[MQL/SQL Debug] Available lifecycle date properties:", lifecycleDateProps);
+    return lifecycleDateProps;
+  } catch (error: any) {
+    console.error("Error fetching contact properties:", error.body?.message || error.message);
+    return [];
+  }
+}
+
 // Fetch all contacts with lifecycle stage date properties for MQL/SQL counting
 // This is more reliable than using the Search API which may reject these filters
 async function fetchContactsWithLifecycleDates(
@@ -736,13 +763,21 @@ async function fetchContactsWithLifecycleDates(
   const client = createHubSpotClient(apiKey);
   const contactDates = new Map<string, { mqlDate: number | null; sqlDate: number | null }>();
 
-  const properties = [
-    "hs_lifecyclestage_marketingqualifiedlead_date",
-    "hs_lifecyclestage_salesqualifiedlead_date",
-  ];
+  // First, discover available lifecycle date properties
+  const availableProps = await getLifecycleDateProperties(apiKey);
+
+  // Determine which properties to use
+  const mqlProp = availableProps.find(p => p.includes("marketingqualifiedlead")) || "hs_lifecyclestage_marketingqualifiedlead_date";
+  const sqlProp = availableProps.find(p => p.includes("salesqualifiedlead")) || "hs_lifecyclestage_salesqualifiedlead_date";
+
+  console.log(`[MQL/SQL Debug] Using MQL property: ${mqlProp}, SQL property: ${sqlProp}`);
+
+  const properties = [mqlProp, sqlProp];
 
   let after: string | undefined;
   let retries = 0;
+  let totalContactsFetched = 0;
+  let debugLogged = false;
 
   while (true) {
     try {
@@ -752,9 +787,24 @@ async function fetchContactsWithLifecycleDates(
         properties,
       );
 
+      totalContactsFetched += response.results?.length || 0;
+
+      // Debug: Log first contact's properties to see what's returned
+      if (!debugLogged && response.results && response.results.length > 0) {
+        console.log("[MQL/SQL Debug] First contact properties:", JSON.stringify(response.results[0].properties, null, 2));
+        // Also log a contact that has lifecycle stage date if we can find one
+        for (const contact of response.results) {
+          if (contact.properties?.[mqlProp] || contact.properties?.[sqlProp]) {
+            console.log("[MQL/SQL Debug] Contact with date:", JSON.stringify(contact.properties, null, 2));
+            break;
+          }
+        }
+        debugLogged = true;
+      }
+
       for (const contact of response.results || []) {
-        const mqlDateStr = contact.properties?.hs_lifecyclestage_marketingqualifiedlead_date;
-        const sqlDateStr = contact.properties?.hs_lifecyclestage_salesqualifiedlead_date;
+        const mqlDateStr = contact.properties?.[mqlProp];
+        const sqlDateStr = contact.properties?.[sqlProp];
 
         const mqlDate = mqlDateStr ? new Date(mqlDateStr).getTime() : null;
         const sqlDate = sqlDateStr ? new Date(sqlDateStr).getTime() : null;
@@ -769,7 +819,7 @@ async function fetchContactsWithLifecycleDates(
       retries = 0;
 
       // Rate limit protection
-      if (contactDates.size % 1000 === 0) {
+      if (totalContactsFetched % 1000 === 0) {
         await new Promise((resolve) => setTimeout(resolve, 200));
       }
     } catch (error: any) {
@@ -786,7 +836,7 @@ async function fetchContactsWithLifecycleDates(
     }
   }
 
-  console.log(`Fetched ${contactDates.size} contacts with MQL/SQL dates`);
+  console.log(`[MQL/SQL Debug] Total contacts fetched: ${totalContactsFetched}, contacts with dates: ${contactDates.size}`);
   return contactDates;
 }
 
