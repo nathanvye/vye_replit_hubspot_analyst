@@ -636,6 +636,98 @@ export async function registerRoutes(
     }
   });
 
+  // Get pipeline metrics for specific year
+  app.get("/api/pipeline-metrics/:accountId", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const year = parseInt(req.query.year as string) || new Date().getFullYear();
+      
+      const apiKey = await getApiKeyForAccount(accountId);
+      if (!apiKey) {
+        return res.status(400).json({ error: "HubSpot account not configured" });
+      }
+
+      const displaySettings = await storage.getDealDisplaySettings(accountId);
+      const selectedPipelines = displaySettings?.selectedPipelines as string[] || [];
+      
+      if (selectedPipelines.length === 0) {
+        return res.json([]);
+      }
+
+      const lifecycleSettings = await storage.getLifecycleStageSettings(accountId);
+      const allPipelines = await getDealPipelines(apiKey);
+      const allDeals = await getDeals(apiKey);
+      const allContacts = await getContacts(apiKey);
+
+      const quarterRanges = {
+        Q1: { start: Date.UTC(year, 0, 1), end: Date.UTC(year, 3, 1) },
+        Q2: { start: Date.UTC(year, 3, 1), end: Date.UTC(year, 6, 1) },
+        Q3: { start: Date.UTC(year, 6, 1), end: Date.UTC(year, 9, 1) },
+        Q4: { start: Date.UTC(year, 9, 1), end: Date.UTC(year + 1, 0, 1) },
+      };
+
+      const metrics = selectedPipelines.map(pipelineId => {
+        const pipeline = allPipelines.find(p => p.id === pipelineId);
+        const pipelineLabel = pipeline?.label || "Unknown Pipeline";
+
+        const pipelineDeals = allDeals.filter(d => d.properties.pipeline === pipelineId);
+        
+        const getDealStats = (deals: any[]) => {
+          const stats = {
+            Q1: { count: 0, value: 0 },
+            Q2: { count: 0, value: 0 },
+            Q3: { count: 0, value: 0 },
+            Q4: { count: 0, value: 0 },
+            total: { count: 0, value: 0 }
+          };
+
+          deals.forEach(d => {
+            const createdDate = new Date(d.properties.createdate).getTime();
+            const amount = parseFloat(d.properties.amount || "0");
+            
+            Object.entries(quarterRanges).forEach(([q, range]) => {
+              if (createdDate >= range.start && createdDate < range.end) {
+                stats[q as keyof typeof stats].count++;
+                stats[q as keyof typeof stats].value += amount;
+                stats.total.count++;
+                stats.total.value += amount;
+              }
+            });
+          });
+
+          return stats;
+        };
+
+        const newDeals = getDealStats(pipelineDeals);
+        const closedDeals = getDealStats(pipelineDeals.filter(d => 
+          d.properties.dealstage?.toLowerCase().includes("won") && 
+          !d.properties.dealstage?.toLowerCase().includes("lost")
+        ));
+
+        // Simplified MQL/SQL for pipeline (based on contacts associated with deals in this pipeline)
+        // This is an approximation as contacts aren't strictly "in" a pipeline
+        const mqlSql = {
+          mql: { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 },
+          sql: { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 },
+          conversionRate: { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 }
+        };
+
+        return {
+          pipelineId,
+          pipelineLabel,
+          newDeals,
+          closedDeals,
+          mqlSql
+        };
+      });
+
+      res.json(metrics);
+    } catch (error) {
+      console.error("Error fetching pipeline metrics:", error);
+      res.status(500).json({ error: "Failed to fetch pipeline metrics" });
+    }
+  });
+
   // Get MQL/SQL counts by quarter based on lifecycle stage settings
   // Uses HubSpot v2 calculated date properties for accurate counts
   app.get("/api/mql-sql-counts/:accountId", async (req, res) => {
