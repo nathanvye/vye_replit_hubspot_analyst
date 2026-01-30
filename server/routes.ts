@@ -18,7 +18,9 @@ import {
   getMarketingEmails,
   getMarketingEmailDetails,
   getDealPipelines,
-  getLifecycleStageOptions
+  getLifecycleStageOptions,
+  getMQLsEnteredInQuarter,
+  getSQLsEnteredInQuarter
 } from "./hubspot-client";
 import { PROOFERBOT_SYSTEM_PROMPT, PROOFERBOT_MODEL_SETTINGS } from "../config/prooferbotRules";
 import OpenAI from 'openai';
@@ -635,6 +637,7 @@ export async function registerRoutes(
   });
 
   // Get MQL/SQL counts by quarter based on lifecycle stage settings
+  // Uses HubSpot v2 calculated date properties for accurate counts
   app.get("/api/mql-sql-counts/:accountId", async (req, res) => {
     try {
       const { accountId } = req.params;
@@ -655,50 +658,33 @@ export async function registerRoutes(
         });
       }
       
-      // Use cache for lifecycle data to speed up subsequent requests
-      const cacheKey = `lifecycle_${accountId}_${year}`;
-      let lifecycleData = await storage.getCache?.(cacheKey);
+      // Use v2 date properties for accurate MQL/SQL counts
+      const [mqlQ1, mqlQ2, mqlQ3, mqlQ4, sqlQ1, sqlQ2, sqlQ3, sqlQ4] = await Promise.all([
+        getMQLsEnteredInQuarter(apiKey, year, "Q1"),
+        getMQLsEnteredInQuarter(apiKey, year, "Q2"),
+        getMQLsEnteredInQuarter(apiKey, year, "Q3"),
+        getMQLsEnteredInQuarter(apiKey, year, "Q4"),
+        getSQLsEnteredInQuarter(apiKey, year, "Q1"),
+        getSQLsEnteredInQuarter(apiKey, year, "Q2"),
+        getSQLsEnteredInQuarter(apiKey, year, "Q3"),
+        getSQLsEnteredInQuarter(apiKey, year, "Q4"),
+      ]);
       
-      if (!lifecycleData) {
-        lifecycleData = await getLifecycleStageBreakdown(apiKey, year);
-        await storage.setCache?.(cacheKey, lifecycleData, 3600); // Cache for 1 hour
-      }
-      
-      const stageKeyToLabel: Record<string, string> = {
-        "subscriber": "Subscriber",
-        "lead": "Lead", 
-        "marketingqualifiedlead": "Marketing Qualified Lead",
-        "salesqualifiedlead": "Sales Qualified Lead",
-        "opportunity": "Opportunity",
-        "customer": "Customer",
-        "evangelist": "Evangelist",
-        "other": "Other"
+      const mqlCounts = {
+        Q1: mqlQ1,
+        Q2: mqlQ2,
+        Q3: mqlQ3,
+        Q4: mqlQ4,
+        total: mqlQ1 + mqlQ2 + mqlQ3 + mqlQ4
       };
       
-      const mqlLabel = lifecycleSettings.mqlStage ? stageKeyToLabel[lifecycleSettings.mqlStage] : null;
-      const sqlLabel = lifecycleSettings.sqlStage ? stageKeyToLabel[lifecycleSettings.sqlStage] : null;
-      
-      if (lifecycleSettings.mqlStage && !mqlLabel) {
-        console.warn(`MQL stage "${lifecycleSettings.mqlStage}" not found in stageKeyToLabel mapping`);
-      }
-      if (lifecycleSettings.sqlStage && !sqlLabel) {
-        console.warn(`SQL stage "${lifecycleSettings.sqlStage}" not found in stageKeyToLabel mapping`);
-      }
-      
-      const mqlCounts = mqlLabel && lifecycleData.quarterlyBecame[mqlLabel] 
-        ? lifecycleData.quarterlyBecame[mqlLabel] 
-        : { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
-        
-      const sqlCounts = sqlLabel && lifecycleData.quarterlyBecame[sqlLabel]
-        ? lifecycleData.quarterlyBecame[sqlLabel]
-        : { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
-        
-      if (mqlLabel && !lifecycleData.quarterlyBecame[mqlLabel]) {
-        console.warn(`MQL label "${mqlLabel}" not found in lifecycleData.quarterlyBecame`);
-      }
-      if (sqlLabel && !lifecycleData.quarterlyBecame[sqlLabel]) {
-        console.warn(`SQL label "${sqlLabel}" not found in lifecycleData.quarterlyBecame`);
-      }
+      const sqlCounts = {
+        Q1: sqlQ1,
+        Q2: sqlQ2,
+        Q3: sqlQ3,
+        Q4: sqlQ4,
+        total: sqlQ1 + sqlQ2 + sqlQ3 + sqlQ4
+      };
       
       const calculateConversionRate = (sql: number, mql: number): number => {
         if (mql === 0) return 0;
