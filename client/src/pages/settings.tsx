@@ -1612,20 +1612,6 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="space-y-4 pt-4 border-t border-border">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label className="text-sm font-medium">New Deals Display</Label>
-                        <p className="text-xs text-muted-foreground">
-                          Toggle visibility of new deals in reports
-                        </p>
-                      </div>
-                      <Switch
-                        checked={showNewDeals}
-                        onCheckedChange={setShowNewDeals}
-                        data-testid="switch-show-new-deals"
-                      />
-                    </div>
-
                     <div className="space-y-4">
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Included Pipelines</Label>

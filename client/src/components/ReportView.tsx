@@ -285,6 +285,16 @@ export function ReportView() {
     })(),
   } : undefined;
 
+  const { data: pipelineData } = useQuery<any[]>({
+    queryKey: [`/api/pipeline-metrics/${selectedAccount}`, selectedYear, report?.title],
+    queryFn: async () => {
+      const response = await fetch(`/api/pipeline-metrics/${selectedAccount}?year=${selectedYear}`);
+      if (!response.ok) throw new Error('Failed to fetch pipeline metrics');
+      return response.json();
+    },
+    enabled: !!selectedAccount && !!report,
+  });
+
   if (!report) {
     return (
       <div className="w-full max-w-3xl mx-auto p-6 md:p-10">
@@ -514,6 +524,7 @@ export function ReportView() {
             formSubmissions={report.formSubmissions}
             hubspotLists={report.hubspotLists}
             mqlSqlData={enrichedMqlSqlData}
+            pipelineMetrics={pipelineData}
           />
         ) : verified && (
           <Card className="overflow-hidden border-border/60 shadow-sm">

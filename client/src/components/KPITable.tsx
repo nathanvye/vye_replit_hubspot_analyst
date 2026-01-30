@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import React from "react";
 
 interface QuarterData {
   projection: number | string;
@@ -51,21 +52,41 @@ interface MqlSqlData {
   sqlGoals?: { q1Goal?: number; q2Goal?: number; q3Goal?: number; q4Goal?: number };
 }
 
+interface PipelineMetric {
+  pipelineId: string;
+  pipelineLabel: string;
+  newDeals: { Q1: { count: number; value: number }; Q2: { count: number; value: number }; Q3: { count: number; value: number }; Q4: { count: number; value: number }; total: { count: number; value: number } };
+  closedDeals: { Q1: { count: number; value: number }; Q2: { count: number; value: number }; Q3: { count: number; value: number }; Q4: { count: number; value: number }; total: { count: number; value: number } };
+  mqlSql: {
+    mql: { Q1: number; Q2: number; Q3: number; Q4: number; total: number };
+    sql: { Q1: number; Q2: number; Q3: number; Q4: number; total: number };
+    conversionRate: { Q1: number; Q2: number; Q3: number; Q4: number; total: number };
+  };
+}
+
 interface KPITableProps {
   rows: KPIRow[];
   year?: number;
   formSubmissions?: FormSubmissionData[];
   hubspotLists?: HubSpotListData[];
   mqlSqlData?: MqlSqlData;
+  pipelineMetrics?: PipelineMetric[];
 }
 
-export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists = [], mqlSqlData }: KPITableProps) {
+export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists = [], mqlSqlData, pipelineMetrics = [] }: KPITableProps) {
   const formatValue = (value: number | string | null) => {
     if (value === null || value === undefined || value === '') return '-';
     if (typeof value === 'number') {
       return value.toLocaleString();
     }
     return value;
+  };
+
+  const formatCurrency = (value: number) => {
+    if (value >= 1000000) {
+      return `$${(value / 1000000).toFixed(2)}M`;
+    }
+    return `$${value.toLocaleString()}`;
   };
 
   const getCellStyle = (actual: number | string | null, goal: number | string | undefined) => {
@@ -365,6 +386,95 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
               </td>
             </tr>
           )}
+
+          {pipelineMetrics.map((pipeline, pIdx) => {
+            const baseIndex = rows.length + formSubmissions.length + hubspotLists.length + (mqlSqlData ? 1 : 0) + (pIdx * 3);
+            
+            return (
+              <React.Fragment key={`pipeline-${pipeline.pipelineId}`}>
+                {/* New Deals Row */}
+                <tr className={cn("border-t border-border", baseIndex % 2 === 0 ? "bg-white dark:bg-slate-900" : "bg-gray-50 dark:bg-slate-800")}>
+                  <td className="px-3 py-3 text-left">
+                    <div className="text-[#5C3D5E] font-semibold">{pipeline.pipelineLabel}: New Deals</div>
+                    <div className="text-xs text-muted-foreground">Pipeline specific deals</div>
+                  </td>
+                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+                  <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold">
+                    {pipeline.newDeals.Q1.count} | {formatCurrency(pipeline.newDeals.Q1.value)}
+                  </td>
+                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+                  <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold">
+                    {pipeline.newDeals.Q2.count} | {formatCurrency(pipeline.newDeals.Q2.value)}
+                  </td>
+                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+                  <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold">
+                    {pipeline.newDeals.Q3.count} | {formatCurrency(pipeline.newDeals.Q3.value)}
+                  </td>
+                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+                  <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold">
+                    {pipeline.newDeals.Q4.count} | {formatCurrency(pipeline.newDeals.Q4.value)}
+                  </td>
+                  <td className="px-3 py-3 text-center bg-green-100 dark:bg-green-900/30 font-semibold">
+                    {pipeline.newDeals.total.count} | {formatCurrency(pipeline.newDeals.total.value)}
+                  </td>
+                </tr>
+
+                {/* Closed Deals Row */}
+                <tr className={cn("border-t border-border", (baseIndex + 1) % 2 === 0 ? "bg-white dark:bg-slate-900" : "bg-gray-50 dark:bg-slate-800")}>
+                  <td className="px-3 py-3 text-left">
+                    <div className="text-[#5C3D5E] font-semibold">{pipeline.pipelineLabel}: Closed Deals</div>
+                    <div className="text-xs text-muted-foreground">Pipeline specific wins</div>
+                  </td>
+                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+                  <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold">
+                    {pipeline.closedDeals.Q1.count} | {formatCurrency(pipeline.closedDeals.Q1.value)}
+                  </td>
+                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+                  <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold">
+                    {pipeline.closedDeals.Q2.count} | {formatCurrency(pipeline.closedDeals.Q2.value)}
+                  </td>
+                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+                  <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold">
+                    {pipeline.closedDeals.Q3.count} | {formatCurrency(pipeline.closedDeals.Q3.value)}
+                  </td>
+                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+                  <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold">
+                    {pipeline.closedDeals.Q4.count} | {formatCurrency(pipeline.closedDeals.Q4.value)}
+                  </td>
+                  <td className="px-3 py-3 text-center bg-green-100 dark:bg-green-900/30 font-semibold">
+                    {pipeline.closedDeals.total.count} | {formatCurrency(pipeline.closedDeals.total.value)}
+                  </td>
+                </tr>
+
+                {/* MQL | SQL Row */}
+                <tr className={cn("border-t border-border", (baseIndex + 2) % 2 === 0 ? "bg-white dark:bg-slate-900" : "bg-gray-50 dark:bg-slate-800")}>
+                  <td className="px-3 py-3 text-left">
+                    <div className="text-[#5C3D5E] font-semibold">{pipeline.pipelineLabel}: MQLs | SQLs | (%)</div>
+                    <div className="text-xs text-muted-foreground">Pipeline specific conversions</div>
+                  </td>
+                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+                  <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold">
+                    {pipeline.mqlSql.mql.Q1} | {pipeline.mqlSql.sql.Q1} | {pipeline.mqlSql.conversionRate.Q1}%
+                  </td>
+                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+                  <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold">
+                    {pipeline.mqlSql.mql.Q2} | {pipeline.mqlSql.sql.Q2} | {pipeline.mqlSql.conversionRate.Q2}%
+                  </td>
+                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+                  <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold">
+                    {pipeline.mqlSql.mql.Q3} | {pipeline.mqlSql.sql.Q3} | {pipeline.mqlSql.conversionRate.Q3}%
+                  </td>
+                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
+                  <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold">
+                    {pipeline.mqlSql.mql.Q4} | {pipeline.mqlSql.sql.Q4} | {pipeline.mqlSql.conversionRate.Q4}%
+                  </td>
+                  <td className="px-3 py-3 text-center bg-green-100 dark:bg-green-900/30 font-semibold">
+                    {pipeline.mqlSql.mql.total} | {pipeline.mqlSql.sql.total} | {pipeline.mqlSql.conversionRate.total}%
+                  </td>
+                </tr>
+              </React.Fragment>
+            );
+          })}
         </tbody>
       </table>
     </div>
