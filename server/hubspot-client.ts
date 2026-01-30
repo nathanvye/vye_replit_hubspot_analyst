@@ -711,6 +711,19 @@ export async function searchDeals(apiKey: string, filters: any) {
     searchRequest.after = filters.after;
   }
 
+  // Ensure all filter values are strings
+  if (searchRequest.filterGroups) {
+    for (const group of searchRequest.filterGroups) {
+      if (group.filters) {
+        for (const filter of group.filters) {
+          if (filter.value !== undefined && filter.value !== null) {
+            filter.value = String(filter.value);
+          }
+        }
+      }
+    }
+  }
+
   const response = await client.crm.deals.searchApi.doSearch(searchRequest);
   return response.results;
 }
@@ -742,12 +755,12 @@ export async function getSQLsEnteredInQuarter(
             {
               propertyName: "hs_lifecyclestage_salesqualifiedlead_date",
               operator: "GTE",
-              value: range.start.toString(),
+              value: String(range.start),
             },
             {
               propertyName: "hs_lifecyclestage_salesqualifiedlead_date",
               operator: "LT",
-              value: range.end.toString(),
+              value: String(range.end),
             },
           ],
         },
@@ -758,13 +771,18 @@ export async function getSQLsEnteredInQuarter(
 
     if (after) searchRequest.after = after;
 
-    const response =
-      await client.crm.contacts.searchApi.doSearch(searchRequest);
+    try {
+      const response =
+        await client.crm.contacts.searchApi.doSearch(searchRequest);
 
-    total += response.results?.length || 0;
+      total += response.results?.length || 0;
 
-    if (!response.paging?.next?.after) break;
-    after = response.paging.next.after;
+      if (!response.paging?.next?.after) break;
+      after = response.paging.next.after;
+    } catch (error: any) {
+      console.error("Error in getSQLsEnteredInQuarter search:", error.body || error);
+      throw error;
+    }
   }
 
   return total;
@@ -797,12 +815,12 @@ export async function getMQLsEnteredInQuarter(
             {
               propertyName: "hs_lifecyclestage_marketingqualifiedlead_date",
               operator: "GTE",
-              value: range.start.toString(),
+              value: String(range.start),
             },
             {
               propertyName: "hs_lifecyclestage_marketingqualifiedlead_date",
               operator: "LT",
-              value: range.end.toString(),
+              value: String(range.end),
             },
           ],
         },
@@ -813,13 +831,18 @@ export async function getMQLsEnteredInQuarter(
 
     if (after) searchRequest.after = after;
 
-    const response =
-      await client.crm.contacts.searchApi.doSearch(searchRequest);
+    try {
+      const response =
+        await client.crm.contacts.searchApi.doSearch(searchRequest);
 
-    total += response.results?.length || 0;
+      total += response.results?.length || 0;
 
-    if (!response.paging?.next?.after) break;
-    after = response.paging.next.after;
+      if (!response.paging?.next?.after) break;
+      after = response.paging.next.after;
+    } catch (error: any) {
+      console.error("Error in getMQLsEnteredInQuarter search:", error.body || error);
+      throw error;
+    }
   }
 
   return total;
@@ -874,12 +897,12 @@ export async function getContactsQuarterly(
                 {
                   propertyName: "createdate",
                   operator: "GTE",
-                  value: range.start.toString(),
+                  value: String(range.start),
                 },
                 {
                   propertyName: "createdate",
                   operator: "LT",
-                  value: range.end.toString(),
+                  value: String(range.end),
                 },
               ],
             },
@@ -892,12 +915,17 @@ export async function getContactsQuarterly(
           searchRequest.after = after;
         }
 
-        const response =
-          await client.crm.contacts.searchApi.doSearch(searchRequest);
-        quarterCount += response.results?.length || 0;
+        try {
+          const response =
+            await client.crm.contacts.searchApi.doSearch(searchRequest);
+          quarterCount += response.results?.length || 0;
 
-        if (!response.paging?.next?.after) break;
-        after = response.paging.next.after;
+          if (!response.paging?.next?.after) break;
+          after = response.paging.next.after;
+        } catch (error: any) {
+          console.error(`Error in getContactsQuarterly ${quarter} search:`, error.body || error);
+          throw error;
+        }
 
         // Safety cap per quarter
         if (quarterCount >= 10000) {
@@ -935,12 +963,12 @@ export async function getContactsQuarterly(
                     {
                       propertyName: "createdate",
                       operator: "GTE",
-                      value: range.start.toString(),
+                      value: String(range.start),
                     },
                     {
                       propertyName: "createdate",
                       operator: "LT",
-                      value: range.end.toString(),
+                      value: String(range.end),
                     },
                   ],
                 },
@@ -953,12 +981,17 @@ export async function getContactsQuarterly(
               searchRequest.after = after;
             }
 
-            const response =
-              await client.crm.contacts.searchApi.doSearch(searchRequest);
-            quarterCount += response.results?.length || 0;
+            try {
+              const response =
+                await client.crm.contacts.searchApi.doSearch(searchRequest);
+              quarterCount += response.results?.length || 0;
 
-            if (!response.paging?.next?.after) break;
-            after = response.paging.next.after;
+              if (!response.paging?.next?.after) break;
+              after = response.paging.next.after;
+            } catch (error: any) {
+              console.error(`Error in getContactsQuarterly retry ${quarter} search:`, error.body || error);
+              throw error;
+            }
 
             if (quarterCount >= 10000) break;
           }
