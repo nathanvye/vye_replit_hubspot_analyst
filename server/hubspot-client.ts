@@ -1644,12 +1644,13 @@ export async function getComprehensiveData(
     }
   }
 
-  // Closed deals by quarter
+  // Closed deals by quarter (deals that are "Won" or "Closed Won" stage)
   const closedDealsByQuarter = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
   const closedDealValueByQuarter = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
   for (const deal of enrichedDeals) {
     const stage = deal.stage?.toLowerCase() || "";
-    if (stage.includes("closed") && (stage.includes("won") || stage.includes("won"))) {
+    // Match "won", "closed won", or any stage containing "won" but not "lost"
+    if (stage.includes("won") && !stage.includes("lost")) {
       const q = getQuarter(deal.closeDate || deal.createDate);
       if (q) {
         closedDealsByQuarter[q]++;
