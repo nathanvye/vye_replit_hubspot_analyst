@@ -1644,6 +1644,20 @@ export async function getComprehensiveData(
     }
   }
 
+  // Closed deals by quarter
+  const closedDealsByQuarter = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
+  const closedDealValueByQuarter = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
+  for (const deal of enrichedDeals) {
+    const stage = deal.stage?.toLowerCase() || "";
+    if (stage.includes("closed") && (stage.includes("won") || stage.includes("won"))) {
+      const q = getQuarter(deal.closeDate || deal.createDate);
+      if (q) {
+        closedDealsByQuarter[q]++;
+        closedDealValueByQuarter[q] += deal.amount;
+      }
+    }
+  }
+
   // Companies by quarter
   const companiesByQuarter = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
   for (const company of enrichedCompanies) {
@@ -1717,6 +1731,8 @@ export async function getComprehensiveData(
         companies: companiesByQuarter,
         newDeals: newDealsByQuarter,
         newDealValue: newDealValueByQuarter,
+        closedDeals: closedDealsByQuarter,
+        closedDealValue: closedDealValueByQuarter,
         mql: mqlQuarterly,
         sql: sqlQuarterly,
       },

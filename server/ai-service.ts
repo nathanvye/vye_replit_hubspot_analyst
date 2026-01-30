@@ -520,6 +520,20 @@ CRITICAL: Every number you mention MUST include commas and come from the VERIFIE
                 q4: { projection: "-", actual: `${quarterly.newDeals?.Q4 || 0} (${formatCurrencyCompact(quarterly.newDealValue?.Q4 || 0)})` },
                 goal: "",
               },
+              {
+                metric: "Closed Deals",
+                subtext: `Deals closed won in HubSpot (${quarterly.year})`,
+                yearEndProjection:
+                  (quarterly.closedDeals?.Q1 || 0) +
+                  (quarterly.closedDeals?.Q2 || 0) +
+                  (quarterly.closedDeals?.Q3 || 0) +
+                  (quarterly.closedDeals?.Q4 || 0),
+                q1: { projection: "-", actual: `${quarterly.closedDeals?.Q1 || 0} (${formatCurrencyCompact(quarterly.closedDealValue?.Q1 || 0)})` },
+                q2: { projection: "-", actual: `${quarterly.closedDeals?.Q2 || 0} (${formatCurrencyCompact(quarterly.closedDealValue?.Q2 || 0)})` },
+                q3: { projection: "-", actual: `${quarterly.closedDeals?.Q3 || 0} (${formatCurrencyCompact(quarterly.closedDealValue?.Q3 || 0)})` },
+                q4: { projection: "-", actual: `${quarterly.closedDeals?.Q4 || 0} (${formatCurrencyCompact(quarterly.closedDealValue?.Q4 || 0)})` },
+                goal: "",
+              },
             ]
           : []),
       ],
