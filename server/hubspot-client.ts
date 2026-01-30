@@ -1631,6 +1631,7 @@ export async function getComprehensiveData(
 
   // New deals by quarter with pipeline filtering
   const newDealsByQuarter = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
+  const newDealValueByQuarter = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
   for (const deal of enrichedDeals) {
     // Apply pipeline filter if specified
     if (pipelineFilter.length > 0 && !pipelineFilter.includes(deal.pipeline)) {
@@ -1639,6 +1640,7 @@ export async function getComprehensiveData(
     const q = getQuarter(deal.createDate);
     if (q) {
       newDealsByQuarter[q]++;
+      newDealValueByQuarter[q] += deal.amount;
     }
   }
 
@@ -1714,6 +1716,7 @@ export async function getComprehensiveData(
         dealValue: dealValueByQuarter,
         companies: companiesByQuarter,
         newDeals: newDealsByQuarter,
+        newDealValue: newDealValueByQuarter,
         mql: mqlQuarterly,
         sql: sqlQuarterly,
       },

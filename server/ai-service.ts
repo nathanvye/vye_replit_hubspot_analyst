@@ -514,10 +514,10 @@ CRITICAL: Every number you mention MUST include commas and come from the VERIFIE
                   (quarterly.newDeals?.Q2 || 0) +
                   (quarterly.newDeals?.Q3 || 0) +
                   (quarterly.newDeals?.Q4 || 0),
-                q1: { projection: "-", actual: quarterly.newDeals?.Q1 || 0 },
-                q2: { projection: "-", actual: quarterly.newDeals?.Q2 || 0 },
-                q3: { projection: "-", actual: quarterly.newDeals?.Q3 || 0 },
-                q4: { projection: "-", actual: quarterly.newDeals?.Q4 || 0 },
+                q1: { projection: "-", actual: `${quarterly.newDeals?.Q1 || 0} ($${((quarterly.newDealValue?.Q1 || 0) / 1000).toFixed(0)}k)` },
+                q2: { projection: "-", actual: `${quarterly.newDeals?.Q2 || 0} ($${((quarterly.newDealValue?.Q2 || 0) / 1000).toFixed(0)}k)` },
+                q3: { projection: "-", actual: `${quarterly.newDeals?.Q3 || 0} ($${((quarterly.newDealValue?.Q3 || 0) / 1000).toFixed(0)}k)` },
+                q4: { projection: "-", actual: `${quarterly.newDeals?.Q4 || 0} ($${((quarterly.newDealValue?.Q4 || 0) / 1000).toFixed(0)}k)` },
                 goal: "",
               },
             ]
