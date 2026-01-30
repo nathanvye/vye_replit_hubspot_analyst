@@ -734,44 +734,44 @@ export async function getSQLsEnteredInQuarter(
   year: number,
   quarter: "Q1" | "Q2" | "Q3" | "Q4",
 ): Promise<number> {
-  const client = createHubSpotClient(apiKey);
+  try {
+    const client = createHubSpotClient(apiKey);
 
-  const quarterRanges: Record<string, { start: number; end: number }> = {
-    Q1: { start: Date.UTC(year, 0, 1), end: Date.UTC(year, 3, 1) },
-    Q2: { start: Date.UTC(year, 3, 1), end: Date.UTC(year, 6, 1) },
-    Q3: { start: Date.UTC(year, 6, 1), end: Date.UTC(year, 9, 1) },
-    Q4: { start: Date.UTC(year, 9, 1), end: Date.UTC(year + 1, 0, 1) },
-  };
-
-  const range = quarterRanges[quarter];
-  let total = 0;
-  let after: string | undefined;
-
-  while (true) {
-    const searchRequest: any = {
-      filterGroups: [
-        {
-          filters: [
-            {
-              propertyName: "hs_lifecyclestage_salesqualifiedlead_date",
-              operator: "GTE",
-              value: String(range.start),
-            },
-            {
-              propertyName: "hs_lifecyclestage_salesqualifiedlead_date",
-              operator: "LT",
-              value: String(range.end),
-            },
-          ],
-        },
-      ],
-      properties: ["hs_lifecyclestage_salesqualifiedlead_date"],
-      limit: 100,
+    const quarterRanges: Record<string, { start: number; end: number }> = {
+      Q1: { start: Date.UTC(year, 0, 1), end: Date.UTC(year, 3, 1) },
+      Q2: { start: Date.UTC(year, 3, 1), end: Date.UTC(year, 6, 1) },
+      Q3: { start: Date.UTC(year, 6, 1), end: Date.UTC(year, 9, 1) },
+      Q4: { start: Date.UTC(year, 9, 1), end: Date.UTC(year + 1, 0, 1) },
     };
 
-    if (after) searchRequest.after = after;
+    const range = quarterRanges[quarter];
+    let total = 0;
+    let after: string | undefined;
 
-    try {
+    while (true) {
+      const searchRequest: any = {
+        filterGroups: [
+          {
+            filters: [
+              {
+                propertyName: "hs_lifecyclestage_salesqualifiedlead_date",
+                operator: "GTE",
+                value: String(range.start),
+              },
+              {
+                propertyName: "hs_lifecyclestage_salesqualifiedlead_date",
+                operator: "LT",
+                value: String(range.end),
+              },
+            ],
+          },
+        ],
+        properties: ["hs_lifecyclestage_salesqualifiedlead_date"],
+        limit: 100,
+      };
+
+      if (after) searchRequest.after = after;
+
       const response =
         await client.crm.contacts.searchApi.doSearch(searchRequest);
 
@@ -779,13 +779,13 @@ export async function getSQLsEnteredInQuarter(
 
       if (!response.paging?.next?.after) break;
       after = response.paging.next.after;
-    } catch (error: any) {
-      console.error("Error in getSQLsEnteredInQuarter search:", error.body || error);
-      throw error;
     }
-  }
 
-  return total;
+    return total;
+  } catch (error: any) {
+    console.warn(`getSQLsEnteredInQuarter ${quarter} failed (returning 0):`, error.body?.message || error.message);
+    return 0;
+  }
 }
 
 // EXACT HubSpot parity: MQLs entered in a quarter
@@ -794,44 +794,44 @@ export async function getMQLsEnteredInQuarter(
   year: number,
   quarter: "Q1" | "Q2" | "Q3" | "Q4",
 ): Promise<number> {
-  const client = createHubSpotClient(apiKey);
+  try {
+    const client = createHubSpotClient(apiKey);
 
-  const quarterRanges: Record<string, { start: number; end: number }> = {
-    Q1: { start: Date.UTC(year, 0, 1), end: Date.UTC(year, 3, 1) },
-    Q2: { start: Date.UTC(year, 3, 1), end: Date.UTC(year, 6, 1) },
-    Q3: { start: Date.UTC(year, 6, 1), end: Date.UTC(year, 9, 1) },
-    Q4: { start: Date.UTC(year, 9, 1), end: Date.UTC(year + 1, 0, 1) },
-  };
-
-  const range = quarterRanges[quarter];
-  let total = 0;
-  let after: string | undefined;
-
-  while (true) {
-    const searchRequest: any = {
-      filterGroups: [
-        {
-          filters: [
-            {
-              propertyName: "hs_lifecyclestage_marketingqualifiedlead_date",
-              operator: "GTE",
-              value: String(range.start),
-            },
-            {
-              propertyName: "hs_lifecyclestage_marketingqualifiedlead_date",
-              operator: "LT",
-              value: String(range.end),
-            },
-          ],
-        },
-      ],
-      properties: ["hs_lifecyclestage_marketingqualifiedlead_date"],
-      limit: 100,
+    const quarterRanges: Record<string, { start: number; end: number }> = {
+      Q1: { start: Date.UTC(year, 0, 1), end: Date.UTC(year, 3, 1) },
+      Q2: { start: Date.UTC(year, 3, 1), end: Date.UTC(year, 6, 1) },
+      Q3: { start: Date.UTC(year, 6, 1), end: Date.UTC(year, 9, 1) },
+      Q4: { start: Date.UTC(year, 9, 1), end: Date.UTC(year + 1, 0, 1) },
     };
 
-    if (after) searchRequest.after = after;
+    const range = quarterRanges[quarter];
+    let total = 0;
+    let after: string | undefined;
 
-    try {
+    while (true) {
+      const searchRequest: any = {
+        filterGroups: [
+          {
+            filters: [
+              {
+                propertyName: "hs_lifecyclestage_marketingqualifiedlead_date",
+                operator: "GTE",
+                value: String(range.start),
+              },
+              {
+                propertyName: "hs_lifecyclestage_marketingqualifiedlead_date",
+                operator: "LT",
+                value: String(range.end),
+              },
+            ],
+          },
+        ],
+        properties: ["hs_lifecyclestage_marketingqualifiedlead_date"],
+        limit: 100,
+      };
+
+      if (after) searchRequest.after = after;
+
       const response =
         await client.crm.contacts.searchApi.doSearch(searchRequest);
 
@@ -839,13 +839,13 @@ export async function getMQLsEnteredInQuarter(
 
       if (!response.paging?.next?.after) break;
       after = response.paging.next.after;
-    } catch (error: any) {
-      console.error("Error in getMQLsEnteredInQuarter search:", error.body || error);
-      throw error;
     }
-  }
 
-  return total;
+    return total;
+  } catch (error: any) {
+    console.warn(`getMQLsEnteredInQuarter ${quarter} failed (returning 0):`, error.body?.message || error.message);
+    return 0;
+  }
 }
 
 // Helper to delay execution
