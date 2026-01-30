@@ -728,15 +728,100 @@ export async function searchDeals(apiKey: string, filters: any) {
   return response.results;
 }
 
-// EXACT HubSpot parity: SQLs entered in a quarter
+// Fetch all contacts with lifecycle stage date properties for MQL/SQL counting
+// This is more reliable than using the Search API which may reject these filters
+async function fetchContactsWithLifecycleDates(
+  apiKey: string,
+): Promise<Map<string, { mqlDate: number | null; sqlDate: number | null }>> {
+  const client = createHubSpotClient(apiKey);
+  const contactDates = new Map<string, { mqlDate: number | null; sqlDate: number | null }>();
+
+  const properties = [
+    "hs_lifecyclestage_marketingqualifiedlead_date",
+    "hs_lifecyclestage_salesqualifiedlead_date",
+  ];
+
+  let after: string | undefined;
+  let retries = 0;
+
+  while (true) {
+    try {
+      const response = await client.crm.contacts.basicApi.getPage(
+        100,
+        after,
+        properties,
+      );
+
+      for (const contact of response.results || []) {
+        const mqlDateStr = contact.properties?.hs_lifecyclestage_marketingqualifiedlead_date;
+        const sqlDateStr = contact.properties?.hs_lifecyclestage_salesqualifiedlead_date;
+
+        const mqlDate = mqlDateStr ? new Date(mqlDateStr).getTime() : null;
+        const sqlDate = sqlDateStr ? new Date(sqlDateStr).getTime() : null;
+
+        if (mqlDate || sqlDate) {
+          contactDates.set(contact.id, { mqlDate, sqlDate });
+        }
+      }
+
+      if (!response.paging?.next?.after) break;
+      after = response.paging.next.after;
+      retries = 0;
+
+      // Rate limit protection
+      if (contactDates.size % 1000 === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    } catch (error: any) {
+      if (error.code === 429 || error.response?.status === 429) {
+        if (retries >= 3) break;
+        const delay = 1000 * Math.pow(2, retries);
+        console.log(`Rate limited in fetchContactsWithLifecycleDates, waiting ${delay}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        retries++;
+        continue;
+      }
+      console.error("Error fetching contacts with lifecycle dates:", error.body?.message || error.message);
+      break;
+    }
+  }
+
+  console.log(`Fetched ${contactDates.size} contacts with MQL/SQL dates`);
+  return contactDates;
+}
+
+// Cache for lifecycle dates to avoid refetching for each quarter
+let lifecycleDatesCache: {
+  apiKey: string;
+  data: Map<string, { mqlDate: number | null; sqlDate: number | null }>;
+  timestamp: number;
+} | null = null;
+
+async function getLifecycleDatesWithCache(
+  apiKey: string,
+): Promise<Map<string, { mqlDate: number | null; sqlDate: number | null }>> {
+  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  if (
+    lifecycleDatesCache &&
+    lifecycleDatesCache.apiKey === apiKey &&
+    Date.now() - lifecycleDatesCache.timestamp < CACHE_TTL
+  ) {
+    return lifecycleDatesCache.data;
+  }
+
+  const data = await fetchContactsWithLifecycleDates(apiKey);
+  lifecycleDatesCache = { apiKey, data, timestamp: Date.now() };
+  return data;
+}
+
+// Count SQLs that entered in a specific quarter by filtering fetched data
 export async function getSQLsEnteredInQuarter(
   apiKey: string,
   year: number,
   quarter: "Q1" | "Q2" | "Q3" | "Q4",
 ): Promise<number> {
   try {
-    const client = createHubSpotClient(apiKey);
-
     const quarterRanges: Record<string, { start: number; end: number }> = {
       Q1: { start: Date.UTC(year, 0, 1), end: Date.UTC(year, 3, 1) },
       Q2: { start: Date.UTC(year, 3, 1), end: Date.UTC(year, 6, 1) },
@@ -745,58 +830,30 @@ export async function getSQLsEnteredInQuarter(
     };
 
     const range = quarterRanges[quarter];
-    let total = 0;
-    let after: string | undefined;
+    const contactDates = await getLifecycleDatesWithCache(apiKey);
 
-    while (true) {
-      const searchRequest: any = {
-        filterGroups: [
-          {
-            filters: [
-              {
-                propertyName: "hs_lifecyclestage_salesqualifiedlead_date",
-                operator: "GTE",
-                value: String(range.start),
-              },
-              {
-                propertyName: "hs_lifecyclestage_salesqualifiedlead_date",
-                operator: "LT",
-                value: String(range.end),
-              },
-            ],
-          },
-        ],
-        properties: ["hs_lifecyclestage_salesqualifiedlead_date"],
-        limit: 100,
-      };
+    let count = 0;
+    contactDates.forEach((dates) => {
+      if (dates.sqlDate && dates.sqlDate >= range.start && dates.sqlDate < range.end) {
+        count++;
+      }
+    });
 
-      if (after) searchRequest.after = after;
-
-      const response =
-        await client.crm.contacts.searchApi.doSearch(searchRequest);
-
-      total += response.results?.length || 0;
-
-      if (!response.paging?.next?.after) break;
-      after = response.paging.next.after;
-    }
-
-    return total;
+    console.log(`SQLs in ${year} ${quarter}: ${count}`);
+    return count;
   } catch (error: any) {
-    console.warn(`getSQLsEnteredInQuarter ${quarter} failed (returning 0):`, error.body?.message || error.message);
+    console.warn(`getSQLsEnteredInQuarter ${quarter} failed (returning 0):`, error.message);
     return 0;
   }
 }
 
-// EXACT HubSpot parity: MQLs entered in a quarter
+// Count MQLs that entered in a specific quarter by filtering fetched data
 export async function getMQLsEnteredInQuarter(
   apiKey: string,
   year: number,
   quarter: "Q1" | "Q2" | "Q3" | "Q4",
 ): Promise<number> {
   try {
-    const client = createHubSpotClient(apiKey);
-
     const quarterRanges: Record<string, { start: number; end: number }> = {
       Q1: { start: Date.UTC(year, 0, 1), end: Date.UTC(year, 3, 1) },
       Q2: { start: Date.UTC(year, 3, 1), end: Date.UTC(year, 6, 1) },
@@ -805,45 +862,19 @@ export async function getMQLsEnteredInQuarter(
     };
 
     const range = quarterRanges[quarter];
-    let total = 0;
-    let after: string | undefined;
+    const contactDates = await getLifecycleDatesWithCache(apiKey);
 
-    while (true) {
-      const searchRequest: any = {
-        filterGroups: [
-          {
-            filters: [
-              {
-                propertyName: "hs_lifecyclestage_marketingqualifiedlead_date",
-                operator: "GTE",
-                value: String(range.start),
-              },
-              {
-                propertyName: "hs_lifecyclestage_marketingqualifiedlead_date",
-                operator: "LT",
-                value: String(range.end),
-              },
-            ],
-          },
-        ],
-        properties: ["hs_lifecyclestage_marketingqualifiedlead_date"],
-        limit: 100,
-      };
+    let count = 0;
+    contactDates.forEach((dates) => {
+      if (dates.mqlDate && dates.mqlDate >= range.start && dates.mqlDate < range.end) {
+        count++;
+      }
+    });
 
-      if (after) searchRequest.after = after;
-
-      const response =
-        await client.crm.contacts.searchApi.doSearch(searchRequest);
-
-      total += response.results?.length || 0;
-
-      if (!response.paging?.next?.after) break;
-      after = response.paging.next.after;
-    }
-
-    return total;
+    console.log(`MQLs in ${year} ${quarter}: ${count}`);
+    return count;
   } catch (error: any) {
-    console.warn(`getMQLsEnteredInQuarter ${quarter} failed (returning 0):`, error.body?.message || error.message);
+    console.warn(`getMQLsEnteredInQuarter ${quarter} failed (returning 0):`, error.message);
     return 0;
   }
 }
