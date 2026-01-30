@@ -589,9 +589,12 @@ export function ReportView() {
       {/* Traffic Analysis Section */}
       {report.gaChannels && report.gaChannels.length > 0 && (
         <section className="space-y-4">
-          <div className="flex items-center gap-2">
-            <PieChartIcon className="w-5 h-5 text-[#5C3D5E]" />
-            <h2 className="text-xl font-semibold text-[#5C3D5E]">Traffic Analysis:</h2>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <PieChartIcon className="w-5 h-5 text-[#5C3D5E]" />
+              <h2 className="text-xl font-semibold text-[#5C3D5E]">Traffic Analysis:</h2>
+            </div>
+            <p className="text-sm text-muted-foreground ml-7">Website traffic by acquisition channel and group ({selectedYear}).</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <ChannelPieChart 

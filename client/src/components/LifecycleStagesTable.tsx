@@ -45,6 +45,9 @@ export function LifecycleStagesTable({ data, year }: LifecycleStagesTableProps) 
           <Users className="w-5 h-5" />
           Lifecycle Stage Progression ({year})
         </CardTitle>
+        <p className="text-sm text-muted-foreground mt-1">
+          HubSpot contact lifecycle stage transitions ({year}).
+        </p>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">

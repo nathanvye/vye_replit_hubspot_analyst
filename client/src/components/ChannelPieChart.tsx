@@ -49,6 +49,9 @@ export function ChannelPieChart({ data, year }: ChannelPieChartProps) {
         <CardTitle className="text-lg text-[#5C3D5E]">
           Traffic by Channel Group ({year})
         </CardTitle>
+        <p className="text-sm text-muted-foreground mt-1">
+          Website traffic from Google Analytics ({year}).
+        </p>
       </CardHeader>
       <CardContent>
         <div className="h-[300px]">
