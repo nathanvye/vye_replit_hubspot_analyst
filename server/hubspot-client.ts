@@ -30,6 +30,10 @@ async function fetchAllPaginated<T>(
   while (allResults.length < maxRecords) {
     try {
       const response = await fetchPage(after);
+      if (!response || !response.results) {
+        console.warn("HubSpot API returned empty or invalid response");
+        break;
+      }
       allResults.push(...response.results);
 
       // Check if there's more data
@@ -690,7 +694,7 @@ export async function getFormSubmissionsQuarterly(
 export async function searchDeals(apiKey: string, filters: any) {
   const client = createHubSpotClient(apiKey);
 
-  const searchRequest = {
+  const searchRequest: any = {
     filterGroups: filters.filterGroups || [],
     sorts: filters.sorts || [],
     properties: filters.properties || [
@@ -703,8 +707,122 @@ export async function searchDeals(apiKey: string, filters: any) {
     limit: filters.limit || 100,
   };
 
+  if (filters.after) {
+    searchRequest.after = filters.after;
+  }
+
   const response = await client.crm.deals.searchApi.doSearch(searchRequest);
   return response.results;
+}
+
+// EXACT HubSpot parity: SQLs entered in a quarter
+export async function getSQLsEnteredInQuarter(
+  apiKey: string,
+  year: number,
+  quarter: "Q1" | "Q2" | "Q3" | "Q4",
+): Promise<number> {
+  const client = createHubSpotClient(apiKey);
+
+  const quarterRanges: Record<string, { start: number; end: number }> = {
+    Q1: { start: Date.UTC(year, 0, 1), end: Date.UTC(year, 3, 1) },
+    Q2: { start: Date.UTC(year, 3, 1), end: Date.UTC(year, 6, 1) },
+    Q3: { start: Date.UTC(year, 6, 1), end: Date.UTC(year, 9, 1) },
+    Q4: { start: Date.UTC(year, 9, 1), end: Date.UTC(year + 1, 0, 1) },
+  };
+
+  const range = quarterRanges[quarter];
+  let total = 0;
+  let after: string | undefined;
+
+  while (true) {
+    const searchRequest: any = {
+      filterGroups: [
+        {
+          filters: [
+            {
+              propertyName: "hs_lifecyclestage_salesqualifiedlead_date",
+              operator: "GTE",
+              value: range.start.toString(),
+            },
+            {
+              propertyName: "hs_lifecyclestage_salesqualifiedlead_date",
+              operator: "LT",
+              value: range.end.toString(),
+            },
+          ],
+        },
+      ],
+      properties: ["hs_lifecyclestage_salesqualifiedlead_date"],
+      limit: 100,
+    };
+
+    if (after) searchRequest.after = after;
+
+    const response =
+      await client.crm.contacts.searchApi.doSearch(searchRequest);
+
+    total += response.results?.length || 0;
+
+    if (!response.paging?.next?.after) break;
+    after = response.paging.next.after;
+  }
+
+  return total;
+}
+
+// EXACT HubSpot parity: MQLs entered in a quarter
+export async function getMQLsEnteredInQuarter(
+  apiKey: string,
+  year: number,
+  quarter: "Q1" | "Q2" | "Q3" | "Q4",
+): Promise<number> {
+  const client = createHubSpotClient(apiKey);
+
+  const quarterRanges: Record<string, { start: number; end: number }> = {
+    Q1: { start: Date.UTC(year, 0, 1), end: Date.UTC(year, 3, 1) },
+    Q2: { start: Date.UTC(year, 3, 1), end: Date.UTC(year, 6, 1) },
+    Q3: { start: Date.UTC(year, 6, 1), end: Date.UTC(year, 9, 1) },
+    Q4: { start: Date.UTC(year, 9, 1), end: Date.UTC(year + 1, 0, 1) },
+  };
+
+  const range = quarterRanges[quarter];
+  let total = 0;
+  let after: string | undefined;
+
+  while (true) {
+    const searchRequest: any = {
+      filterGroups: [
+        {
+          filters: [
+            {
+              propertyName: "hs_lifecyclestage_marketingqualifiedlead_date",
+              operator: "GTE",
+              value: range.start.toString(),
+            },
+            {
+              propertyName: "hs_lifecyclestage_marketingqualifiedlead_date",
+              operator: "LT",
+              value: range.end.toString(),
+            },
+          ],
+        },
+      ],
+      properties: ["hs_lifecyclestage_marketingqualifiedlead_date"],
+      limit: 100,
+    };
+
+    if (after) searchRequest.after = after;
+
+    const response =
+      await client.crm.contacts.searchApi.doSearch(searchRequest);
+
+    total += response.results?.length || 0;
+
+    if (!response.paging?.next?.after) break;
+    after = response.paging.next.after;
+  }
+
+  return total;
 }
 
 // Helper to delay execution
@@ -756,12 +874,12 @@ export async function getContactsQuarterly(
                 {
                   propertyName: "createdate",
                   operator: "GTE",
-                  value: range.start,
+                  value: range.start.toString(),
                 },
                 {
                   propertyName: "createdate",
                   operator: "LT",
-                  value: range.end,
+                  value: range.end.toString(),
                 },
               ],
             },
@@ -817,12 +935,12 @@ export async function getContactsQuarterly(
                     {
                       propertyName: "createdate",
                       operator: "GTE",
-                      value: range.start,
+                      value: range.start.toString(),
                     },
                     {
                       propertyName: "createdate",
                       operator: "LT",
-                      value: range.end,
+                      value: range.end.toString(),
                     },
                   ],
                 },
@@ -873,11 +991,6 @@ async function runReportForDateRange(
   endDate: string,
 ): Promise<number> {
   try {
-    console.log(
-      `Step 2: POST https://api.hubapi.com/reports/v2/reports/${reportId}/data`,
-    );
-    console.log(`  Date range: ${startDate} to ${endDate}`);
-
     const response = await fetch(
       `https://api.hubapi.com/reports/v2/reports/${reportId}/data`,
       {
@@ -894,8 +1007,6 @@ async function runReportForDateRange(
       },
     );
 
-    console.log(`Report data response status: ${response.status}`);
-
     if (!response.ok) {
       const errorText = await response.text();
       console.error(
@@ -906,10 +1017,6 @@ async function runReportForDateRange(
     }
 
     const data = await response.json();
-    console.log(
-      `Report data response:`,
-      JSON.stringify(data, null, 2).substring(0, 1000),
-    );
 
     // Step 3: Sum all values from the data array
     let totalSessions = 0;
@@ -923,9 +1030,6 @@ async function runReportForDateRange(
           totalSessions += parseInt(value, 10) || 0;
         }
       }
-      console.log(
-        `Step 3: Summed ${data.data.length} sources = ${totalSessions} total sessions`,
-      );
     } else if (data.totals?.sessions !== undefined) {
       totalSessions = data.totals.sessions;
     } else if (data.total !== undefined) {
@@ -1135,17 +1239,25 @@ export async function getContactsWithLifecycleHistory(
   }, maxRecords);
 
   console.log(`Fetched ${contacts.length} contacts with lifecycle history`);
-  
+
   // Debug: Log first contact's FULL properties to see what HubSpot actually returns
   if (contacts.length > 0) {
-    console.log(`[Lifecycle History Debug] First contact FULL properties:`, JSON.stringify(contacts[0].properties, null, 2));
-    
-    // Also check which property keys contain "lifecycle" 
+    console.log(
+      `[Lifecycle History Debug] First contact FULL properties:`,
+      JSON.stringify(contacts[0].properties, null, 2),
+    );
+
+    // Also check which property keys contain "lifecycle"
     const allKeys = Object.keys(contacts[0].properties);
-    const lifecycleKeys = allKeys.filter(k => k.toLowerCase().includes('lifecycle'));
-    console.log(`[Lifecycle History Debug] Available lifecycle-related properties:`, lifecycleKeys);
+    const lifecycleKeys = allKeys.filter((k) =>
+      k.toLowerCase().includes("lifecycle"),
+    );
+    console.log(
+      `[Lifecycle History Debug] Available lifecycle-related properties:`,
+      lifecycleKeys,
+    );
   }
-  
+
   return contacts;
 }
 
@@ -1242,7 +1354,7 @@ export async function getLifecycleStageBreakdown(
   // First try: Check if lifecycle date properties are available
   let usedLifecycleDates = false;
   let contactsWithDates = 0;
-  
+
   for (const contact of contacts) {
     const currentStage = contact.properties.lifecyclestage;
 
@@ -1256,7 +1368,7 @@ export async function getLifecycleStageBreakdown(
     for (const stage of lifecycleStages) {
       const becameValue =
         contact.properties[stage.dateField as keyof typeof contact.properties];
-      
+
       // HubSpot sometimes returns empty strings, null, or "0" for dates that haven't occurred
       if (!becameValue || becameValue === "0" || becameValue === "") continue;
 
@@ -1269,39 +1381,49 @@ export async function getLifecycleStageBreakdown(
       }
     }
   }
-  
-  console.log(`[Lifecycle Debug] Contacts with lifecycle date properties: ${contactsWithDates}`);
+
+  console.log(
+    `[Lifecycle Debug] Contacts with lifecycle date properties: ${contactsWithDates}`,
+  );
   console.log(`[Lifecycle Debug] Year filter: ${year}`);
 
   // Fallback: If no lifecycle date properties were found, use createdate as approximation
   // This counts contacts who are currently in each stage, grouped by when they were created
   if (!usedLifecycleDates) {
-    console.log(`[Lifecycle Debug] No lifecycle date properties found. Using createdate as fallback.`);
-    
+    console.log(
+      `[Lifecycle Debug] No lifecycle date properties found. Using createdate as fallback.`,
+    );
+
     // Reset quarterly counts
     for (const stage of lifecycleStages) {
       quarterlyBecame[stage.label] = { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
     }
-    
+
     for (const contact of contacts) {
       const currentStage = contact.properties.lifecyclestage;
       const createDate = contact.properties.createdate;
-      
+
       if (!currentStage || !createDate) continue;
-      
+
       const stageInfo = lifecycleStages.find((s) => s.key === currentStage);
       if (!stageInfo) continue;
-      
+
       const quarter = getQuarter(createDate);
       if (quarter) {
         quarterlyBecame[stageInfo.label][quarter]++;
         quarterlyBecame[stageInfo.label].total++;
       }
     }
-    
-    console.log(`[Lifecycle Debug] Using createdate fallback - QuarterlyBecame result:`, JSON.stringify(quarterlyBecame, null, 2));
+
+    console.log(
+      `[Lifecycle Debug] Using createdate fallback - QuarterlyBecame result:`,
+      JSON.stringify(quarterlyBecame, null, 2),
+    );
   } else {
-    console.log(`[Lifecycle Debug] QuarterlyBecame result:`, JSON.stringify(quarterlyBecame, null, 2));
+    console.log(
+      `[Lifecycle Debug] QuarterlyBecame result:`,
+      JSON.stringify(quarterlyBecame, null, 2),
+    );
   }
 
   return { currentCounts, quarterlyBecame };
@@ -1525,12 +1647,39 @@ export async function getComprehensiveData(
   }
 
   // Extract MQL and SQL quarterly data from lifecycle data
-  const mqlQuarterly = lifecycleData.quarterlyBecame[
-    "Marketing Qualified Lead"
-  ] || { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
-  const sqlQuarterly = lifecycleData.quarterlyBecame[
-    "Sales Qualified Lead"
-  ] || { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 };
+  const mqlQuarterly: {
+    Q1: number;
+    Q2: number;
+    Q3: number;
+    Q4: number;
+    total: number;
+  } = {
+    Q1: await getMQLsEnteredInQuarter(apiKey, year, "Q1"),
+    Q2: await getMQLsEnteredInQuarter(apiKey, year, "Q2"),
+    Q3: await getMQLsEnteredInQuarter(apiKey, year, "Q3"),
+    Q4: await getMQLsEnteredInQuarter(apiKey, year, "Q4"),
+    total: 0,
+  };
+
+  mqlQuarterly["total"] =
+    mqlQuarterly.Q1 + mqlQuarterly.Q2 + mqlQuarterly.Q3 + mqlQuarterly.Q4;
+
+  const sqlQuarterly: {
+    Q1: number;
+    Q2: number;
+    Q3: number;
+    Q4: number;
+    total: number;
+  } = {
+    Q1: await getSQLsEnteredInQuarter(apiKey, year, "Q1"),
+    Q2: await getSQLsEnteredInQuarter(apiKey, year, "Q2"),
+    Q3: await getSQLsEnteredInQuarter(apiKey, year, "Q3"),
+    Q4: await getSQLsEnteredInQuarter(apiKey, year, "Q4"),
+    total: 0,
+  };
+
+  sqlQuarterly["total"] =
+    sqlQuarterly.Q1 + sqlQuarterly.Q2 + sqlQuarterly.Q3 + sqlQuarterly.Q4;
 
   return {
     deals: enrichedDeals,
