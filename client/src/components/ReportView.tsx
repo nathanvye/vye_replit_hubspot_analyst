@@ -290,10 +290,14 @@ export function ReportView() {
     queryFn: async () => {
       const response = await fetch(`/api/pipeline-metrics/${selectedAccount}?year=${selectedYear}`);
       if (!response.ok) throw new Error('Failed to fetch pipeline metrics');
-      return response.json();
+      const data = await response.json();
+      console.log("Pipeline metrics received:", data);
+      return data;
     },
     enabled: !!selectedAccount && !!report,
   });
+
+  console.log("Rendering ReportView with pipelineData:", pipelineData);
 
   if (!report) {
     return (

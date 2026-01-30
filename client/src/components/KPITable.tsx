@@ -387,8 +387,9 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
             </tr>
           )}
 
-          {pipelineMetrics.map((pipeline, pIdx) => {
+          {pipelineMetrics && pipelineMetrics.length > 0 && pipelineMetrics.map((pipeline, pIdx) => {
             const baseIndex = rows.length + formSubmissions.length + hubspotLists.length + (mqlSqlData ? 1 : 0) + (pIdx * 3);
+            console.log(`Rendering pipeline rows for ${pipeline.pipelineLabel}`, pipeline);
             
             return (
               <React.Fragment key={`pipeline-${pipeline.pipelineId}`}>
