@@ -1610,6 +1610,81 @@ export default function SettingsPage() {
                       </Button>
                     </div>
                   </div>
+
+                  <div className="space-y-4 pt-4 border-t border-border">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label className="text-sm font-medium">New Deals Display</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Toggle visibility of new deals in reports
+                        </p>
+                      </div>
+                      <Switch
+                        checked={showNewDeals}
+                        onCheckedChange={setShowNewDeals}
+                        data-testid="switch-show-new-deals"
+                      />
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Included Pipelines</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Filter new deals based on specific pipelines
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                          {isLoadingPipelines ? (
+                            <div className="flex items-center text-sm text-muted-foreground">
+                              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                              Loading pipelines...
+                            </div>
+                          ) : availablePipelines.length > 0 ? (
+                            availablePipelines.map((pipeline) => (
+                              <div
+                                key={pipeline.id}
+                                className="flex items-center space-x-2"
+                              >
+                                <Checkbox
+                                  id={`pipeline-${pipeline.id}`}
+                                  checked={selectedPipelines.includes(pipeline.id)}
+                                  onCheckedChange={() =>
+                                    handlePipelineToggle(pipeline.id)
+                                  }
+                                />
+                                <Label
+                                  htmlFor={`pipeline-${pipeline.id}`}
+                                  className="text-sm font-normal cursor-pointer"
+                                >
+                                  {pipeline.label}
+                                </Label>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-xs text-muted-foreground col-span-2 italic">
+                              No pipelines found for this account.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSaveDealDisplaySettings}
+                          disabled={isSavingDealSettings}
+                          data-testid="button-save-deal-settings"
+                        >
+                          {isSavingDealSettings ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          ) : (
+                            <Save className="w-4 h-4 mr-2" />
+                          )}
+                          Save Deal Settings
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
