@@ -297,7 +297,38 @@ export function ReportView() {
     enabled: !!selectedAccount && !!report,
   });
 
-  console.log("Rendering ReportView with pipelineData:", pipelineData);
+  const { data: pipelineGoals } = useQuery<any[]>({
+    queryKey: [`/api/pipeline-goals/${selectedAccount}`, selectedYear],
+    queryFn: async () => {
+      const response = await fetch(`/api/pipeline-goals/${selectedAccount}?year=${selectedYear}`);
+      if (!response.ok) throw new Error('Failed to fetch pipeline goals');
+      return response.json();
+    },
+    enabled: !!selectedAccount,
+  });
+
+  const pipelineMetricsWithGoals = pipelineData?.map((pipeline: any) => {
+    const goals = pipelineGoals?.find((g: any) => g.pipelineId === pipeline.pipelineId);
+    return {
+      ...pipeline,
+      goals: goals ? {
+        q1Goal: goals.q1Goal,
+        q2Goal: goals.q2Goal,
+        q3Goal: goals.q3Goal,
+        q4Goal: goals.q4Goal,
+        q1MqlGoal: goals.q1MqlGoal,
+        q2MqlGoal: goals.q2MqlGoal,
+        q3MqlGoal: goals.q3MqlGoal,
+        q4MqlGoal: goals.q4MqlGoal,
+        q1SqlGoal: goals.q1SqlGoal,
+        q2SqlGoal: goals.q2SqlGoal,
+        q3SqlGoal: goals.q3SqlGoal,
+        q4SqlGoal: goals.q4SqlGoal,
+      } : undefined,
+    };
+  });
+
+  console.log("Rendering ReportView with pipelineData:", pipelineData, "pipelineGoals:", pipelineGoals);
 
   if (!report) {
     return (
@@ -528,7 +559,7 @@ export function ReportView() {
             formSubmissions={report.formSubmissions}
             hubspotLists={report.hubspotLists}
             mqlSqlData={enrichedMqlSqlData}
-            pipelineMetrics={pipelineData}
+            pipelineMetrics={pipelineMetricsWithGoals}
           />
         ) : verified && (
           <Card className="overflow-hidden border-border/60 shadow-sm">

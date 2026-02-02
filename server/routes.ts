@@ -556,6 +556,7 @@ export async function registerRoutes(
     pipelineId: z.string().min(1, "Pipeline ID is required"),
     pipelineName: z.string().min(1, "Pipeline name is required"),
     year: z.number().min(2020).max(2100),
+    // New Deals goals (count and value)
     q1Goal: integerOrStringSchema.optional().default(0),
     q2Goal: integerOrStringSchema.optional().default(0),
     q3Goal: integerOrStringSchema.optional().default(0),
@@ -564,6 +565,16 @@ export async function registerRoutes(
     q2ValueGoal: integerOrStringSchema.optional().default(0),
     q3ValueGoal: integerOrStringSchema.optional().default(0),
     q4ValueGoal: integerOrStringSchema.optional().default(0),
+    // MQL goals
+    q1MqlGoal: integerOrStringSchema.optional().default(0),
+    q2MqlGoal: integerOrStringSchema.optional().default(0),
+    q3MqlGoal: integerOrStringSchema.optional().default(0),
+    q4MqlGoal: integerOrStringSchema.optional().default(0),
+    // SQL goals
+    q1SqlGoal: integerOrStringSchema.optional().default(0),
+    q2SqlGoal: integerOrStringSchema.optional().default(0),
+    q3SqlGoal: integerOrStringSchema.optional().default(0),
+    q4SqlGoal: integerOrStringSchema.optional().default(0),
   });
 
   app.post("/api/pipeline-goals", async (req, res) => {

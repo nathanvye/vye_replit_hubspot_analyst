@@ -62,6 +62,20 @@ interface PipelineMetric {
     sql: { Q1: number; Q2: number; Q3: number; Q4: number; total: number };
     conversionRate: { Q1: number; Q2: number; Q3: number; Q4: number; total: number };
   };
+  goals?: {
+    q1Goal?: number;
+    q2Goal?: number;
+    q3Goal?: number;
+    q4Goal?: number;
+    q1MqlGoal?: number;
+    q2MqlGoal?: number;
+    q3MqlGoal?: number;
+    q4MqlGoal?: number;
+    q1SqlGoal?: number;
+    q2SqlGoal?: number;
+    q3SqlGoal?: number;
+    q4SqlGoal?: number;
+  };
 }
 
 interface KPITableProps {
@@ -389,7 +403,10 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
 
           {pipelineMetrics && pipelineMetrics.length > 0 && pipelineMetrics.map((pipeline, pIdx) => {
             const baseIndex = rows.length + formSubmissions.length + hubspotLists.length + (mqlSqlData ? 1 : 0) + (pIdx * 3);
-            console.log(`Rendering pipeline rows for ${pipeline.pipelineLabel}`, pipeline);
+            const goals = pipeline.goals || {};
+            const newDealsGoalTotal = (goals.q1Goal || 0) + (goals.q2Goal || 0) + (goals.q3Goal || 0) + (goals.q4Goal || 0);
+            const mqlGoalTotal = (goals.q1MqlGoal || 0) + (goals.q2MqlGoal || 0) + (goals.q3MqlGoal || 0) + (goals.q4MqlGoal || 0);
+            const sqlGoalTotal = (goals.q1SqlGoal || 0) + (goals.q2SqlGoal || 0) + (goals.q3SqlGoal || 0) + (goals.q4SqlGoal || 0);
             
             return (
               <React.Fragment key={`pipeline-${pipeline.pipelineId}`}>
@@ -399,24 +416,36 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
                     <div className="text-[#5C3D5E] font-semibold">{pipeline.pipelineLabel}: New Deals</div>
                     <div className="text-xs text-muted-foreground">Pipeline specific deals</div>
                   </td>
-                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
-                  <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold">
+                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">
+                    {goals.q1Goal || '-'}
+                  </td>
+                  <td className={cn("px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold", getCellStyle(pipeline.newDeals.Q1.count, goals.q1Goal))}>
                     {pipeline.newDeals.Q1.count} | {formatCurrency(pipeline.newDeals.Q1.value)}
                   </td>
-                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
-                  <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold">
+                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">
+                    {goals.q2Goal || '-'}
+                  </td>
+                  <td className={cn("px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold", getCellStyle(pipeline.newDeals.Q2.count, goals.q2Goal))}>
                     {pipeline.newDeals.Q2.count} | {formatCurrency(pipeline.newDeals.Q2.value)}
                   </td>
-                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
-                  <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold">
+                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">
+                    {goals.q3Goal || '-'}
+                  </td>
+                  <td className={cn("px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold", getCellStyle(pipeline.newDeals.Q3.count, goals.q3Goal))}>
                     {pipeline.newDeals.Q3.count} | {formatCurrency(pipeline.newDeals.Q3.value)}
                   </td>
-                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
-                  <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold">
+                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">
+                    {goals.q4Goal || '-'}
+                  </td>
+                  <td className={cn("px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold", getCellStyle(pipeline.newDeals.Q4.count, goals.q4Goal))}>
                     {pipeline.newDeals.Q4.count} | {formatCurrency(pipeline.newDeals.Q4.value)}
                   </td>
-                  <td className="px-3 py-3 text-center bg-green-100 dark:bg-green-900/30 font-semibold">
-                    {pipeline.newDeals.total.count} | {formatCurrency(pipeline.newDeals.total.value)}
+                  <td className={cn("px-3 py-3 text-center bg-green-100 dark:bg-green-900/30 font-semibold", getCellStyle(pipeline.newDeals.total.count, newDealsGoalTotal > 0 ? newDealsGoalTotal : undefined))}>
+                    <span className={getCellStyle(pipeline.newDeals.total.count, newDealsGoalTotal > 0 ? newDealsGoalTotal : undefined)}>
+                      {pipeline.newDeals.total.count}
+                    </span>
+                    {newDealsGoalTotal > 0 && <span className="text-muted-foreground"> / {newDealsGoalTotal}</span>}
+                    <span className="text-muted-foreground"> | </span>{formatCurrency(pipeline.newDeals.total.value)}
                   </td>
                 </tr>
 
@@ -453,24 +482,49 @@ export function KPITable({ rows, year = 2025, formSubmissions = [], hubspotLists
                     <div className="text-[#5C3D5E] font-semibold">{pipeline.pipelineLabel}: MQLs | SQLs | (%)</div>
                     <div className="text-xs text-muted-foreground">Pipeline specific conversions</div>
                   </td>
-                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
-                  <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold">
-                    {pipeline.mqlSql.mql.Q1} | {pipeline.mqlSql.sql.Q1} | {pipeline.mqlSql.conversionRate.Q1}%
+                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">
+                    {goals.q1MqlGoal || goals.q1SqlGoal ? `${goals.q1MqlGoal || 0} | ${goals.q1SqlGoal || 0}` : '-'}
                   </td>
-                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
                   <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold">
-                    {pipeline.mqlSql.mql.Q2} | {pipeline.mqlSql.sql.Q2} | {pipeline.mqlSql.conversionRate.Q2}%
+                    <span className={getCellStyle(pipeline.mqlSql.mql.Q1, goals.q1MqlGoal)}>{pipeline.mqlSql.mql.Q1}</span>
+                    <span> | </span>
+                    <span className={getCellStyle(pipeline.mqlSql.sql.Q1, goals.q1SqlGoal)}>{pipeline.mqlSql.sql.Q1}</span>
+                    <span> | {pipeline.mqlSql.conversionRate.Q1}%</span>
                   </td>
-                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
-                  <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold">
-                    {pipeline.mqlSql.mql.Q3} | {pipeline.mqlSql.sql.Q3} | {pipeline.mqlSql.conversionRate.Q3}%
+                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">
+                    {goals.q2MqlGoal || goals.q2SqlGoal ? `${goals.q2MqlGoal || 0} | ${goals.q2SqlGoal || 0}` : '-'}
                   </td>
-                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">-</td>
                   <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold">
-                    {pipeline.mqlSql.mql.Q4} | {pipeline.mqlSql.sql.Q4} | {pipeline.mqlSql.conversionRate.Q4}%
+                    <span className={getCellStyle(pipeline.mqlSql.mql.Q2, goals.q2MqlGoal)}>{pipeline.mqlSql.mql.Q2}</span>
+                    <span> | </span>
+                    <span className={getCellStyle(pipeline.mqlSql.sql.Q2, goals.q2SqlGoal)}>{pipeline.mqlSql.sql.Q2}</span>
+                    <span> | {pipeline.mqlSql.conversionRate.Q2}%</span>
+                  </td>
+                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">
+                    {goals.q3MqlGoal || goals.q3SqlGoal ? `${goals.q3MqlGoal || 0} | ${goals.q3SqlGoal || 0}` : '-'}
+                  </td>
+                  <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold">
+                    <span className={getCellStyle(pipeline.mqlSql.mql.Q3, goals.q3MqlGoal)}>{pipeline.mqlSql.mql.Q3}</span>
+                    <span> | </span>
+                    <span className={getCellStyle(pipeline.mqlSql.sql.Q3, goals.q3SqlGoal)}>{pipeline.mqlSql.sql.Q3}</span>
+                    <span> | {pipeline.mqlSql.conversionRate.Q3}%</span>
+                  </td>
+                  <td className="px-3 py-3 text-center bg-purple-50 dark:bg-purple-950/20">
+                    {goals.q4MqlGoal || goals.q4SqlGoal ? `${goals.q4MqlGoal || 0} | ${goals.q4SqlGoal || 0}` : '-'}
+                  </td>
+                  <td className="px-3 py-3 text-center bg-purple-100 dark:bg-purple-900/30 font-semibold">
+                    <span className={getCellStyle(pipeline.mqlSql.mql.Q4, goals.q4MqlGoal)}>{pipeline.mqlSql.mql.Q4}</span>
+                    <span> | </span>
+                    <span className={getCellStyle(pipeline.mqlSql.sql.Q4, goals.q4SqlGoal)}>{pipeline.mqlSql.sql.Q4}</span>
+                    <span> | {pipeline.mqlSql.conversionRate.Q4}%</span>
                   </td>
                   <td className="px-3 py-3 text-center bg-green-100 dark:bg-green-900/30 font-semibold">
-                    {pipeline.mqlSql.mql.total} | {pipeline.mqlSql.sql.total} | {pipeline.mqlSql.conversionRate.total}%
+                    <span className={getCellStyle(pipeline.mqlSql.mql.total, mqlGoalTotal > 0 ? mqlGoalTotal : undefined)}>{pipeline.mqlSql.mql.total}</span>
+                    {mqlGoalTotal > 0 && <span className="text-muted-foreground">/{mqlGoalTotal}</span>}
+                    <span> | </span>
+                    <span className={getCellStyle(pipeline.mqlSql.sql.total, sqlGoalTotal > 0 ? sqlGoalTotal : undefined)}>{pipeline.mqlSql.sql.total}</span>
+                    {sqlGoalTotal > 0 && <span className="text-muted-foreground">/{sqlGoalTotal}</span>}
+                    <span> | {pipeline.mqlSql.conversionRate.total}%</span>
                   </td>
                 </tr>
               </React.Fragment>

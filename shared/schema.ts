@@ -242,6 +242,7 @@ export const pipelineGoals = pgTable("pipeline_goals", {
   pipelineId: text("pipeline_id").notNull(),
   pipelineName: text("pipeline_name").notNull(),
   year: integer("year").notNull(),
+  // New Deals goals (count and value)
   q1Goal: integer("q1_goal").default(0),
   q2Goal: integer("q2_goal").default(0),
   q3Goal: integer("q3_goal").default(0),
@@ -250,6 +251,16 @@ export const pipelineGoals = pgTable("pipeline_goals", {
   q2ValueGoal: integer("q2_value_goal").default(0),
   q3ValueGoal: integer("q3_value_goal").default(0),
   q4ValueGoal: integer("q4_value_goal").default(0),
+  // MQL goals
+  q1MqlGoal: integer("q1_mql_goal").default(0),
+  q2MqlGoal: integer("q2_mql_goal").default(0),
+  q3MqlGoal: integer("q3_mql_goal").default(0),
+  q4MqlGoal: integer("q4_mql_goal").default(0),
+  // SQL goals
+  q1SqlGoal: integer("q1_sql_goal").default(0),
+  q2SqlGoal: integer("q2_sql_goal").default(0),
+  q3SqlGoal: integer("q3_sql_goal").default(0),
+  q4SqlGoal: integer("q4_sql_goal").default(0),
 });
 
 export const insertPipelineGoalSchema = createInsertSchema(pipelineGoals).omit({ 

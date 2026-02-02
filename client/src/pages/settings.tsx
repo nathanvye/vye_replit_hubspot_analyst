@@ -134,6 +134,21 @@ export default function SettingsPage() {
   const [selectedPipelines, setSelectedPipelines] = useState<string[]>([]);
   const [isLoadingPipelines, setIsLoadingPipelines] = useState(false);
   const [isSavingDealSettings, setIsSavingDealSettings] = useState(false);
+  
+  // Pipeline Goals state
+  const [pipelineGoals, setPipelineGoals] = useState<Record<string, any>>({});
+  const [expandedPipelineId, setExpandedPipelineId] = useState<string | null>(null);
+  const [pipelineGoalYear, setPipelineGoalYear] = useState<number>(new Date().getFullYear());
+  const [pipelineGoalInputs, setPipelineGoalInputs] = useState<{
+    newDealsQ1: string; newDealsQ2: string; newDealsQ3: string; newDealsQ4: string;
+    mqlQ1: string; mqlQ2: string; mqlQ3: string; mqlQ4: string;
+    sqlQ1: string; sqlQ2: string; sqlQ3: string; sqlQ4: string;
+  }>({
+    newDealsQ1: "", newDealsQ2: "", newDealsQ3: "", newDealsQ4: "",
+    mqlQ1: "", mqlQ2: "", mqlQ3: "", mqlQ4: "",
+    sqlQ1: "", sqlQ2: "", sqlQ3: "", sqlQ4: "",
+  });
+  const [isSavingPipelineGoal, setIsSavingPipelineGoal] = useState(false);
 
   // Lifecycle Stage Settings state
   const [lifecycleStageOptions, setLifecycleStageOptions] = useState<
@@ -772,6 +787,141 @@ export default function SettingsPage() {
     );
   };
 
+  // Pipeline Goals functions
+  const loadPipelineGoals = async () => {
+    if (!selectedAccount) return;
+    try {
+      const response = await fetch(`/api/pipeline-goals/${selectedAccount}`);
+      if (response.ok) {
+        const data = await response.json();
+        const goalsMap: Record<string, any> = {};
+        data.forEach((g: any) => {
+          goalsMap[`${g.pipelineId}-${g.year}`] = g;
+        });
+        setPipelineGoals(goalsMap);
+      }
+    } catch (error) {
+      console.error("Failed to load pipeline goals:", error);
+    }
+  };
+
+  const handleTogglePipelineGoals = (pipelineId: string) => {
+    if (expandedPipelineId === pipelineId) {
+      setExpandedPipelineId(null);
+      return;
+    }
+
+    setExpandedPipelineId(pipelineId);
+    const key = `${pipelineId}-${pipelineGoalYear}`;
+    const goals = pipelineGoals[key];
+    if (goals) {
+      setPipelineGoalInputs({
+        newDealsQ1: goals.q1Goal?.toString() || "",
+        newDealsQ2: goals.q2Goal?.toString() || "",
+        newDealsQ3: goals.q3Goal?.toString() || "",
+        newDealsQ4: goals.q4Goal?.toString() || "",
+        mqlQ1: goals.q1MqlGoal?.toString() || "",
+        mqlQ2: goals.q2MqlGoal?.toString() || "",
+        mqlQ3: goals.q3MqlGoal?.toString() || "",
+        mqlQ4: goals.q4MqlGoal?.toString() || "",
+        sqlQ1: goals.q1SqlGoal?.toString() || "",
+        sqlQ2: goals.q2SqlGoal?.toString() || "",
+        sqlQ3: goals.q3SqlGoal?.toString() || "",
+        sqlQ4: goals.q4SqlGoal?.toString() || "",
+      });
+    } else {
+      setPipelineGoalInputs({
+        newDealsQ1: "", newDealsQ2: "", newDealsQ3: "", newDealsQ4: "",
+        mqlQ1: "", mqlQ2: "", mqlQ3: "", mqlQ4: "",
+        sqlQ1: "", sqlQ2: "", sqlQ3: "", sqlQ4: "",
+      });
+    }
+  };
+
+  const handlePipelineGoalYearChange = (year: number, pipelineId: string) => {
+    setPipelineGoalYear(year);
+    const key = `${pipelineId}-${year}`;
+    const goals = pipelineGoals[key];
+    if (goals) {
+      setPipelineGoalInputs({
+        newDealsQ1: goals.q1Goal?.toString() || "",
+        newDealsQ2: goals.q2Goal?.toString() || "",
+        newDealsQ3: goals.q3Goal?.toString() || "",
+        newDealsQ4: goals.q4Goal?.toString() || "",
+        mqlQ1: goals.q1MqlGoal?.toString() || "",
+        mqlQ2: goals.q2MqlGoal?.toString() || "",
+        mqlQ3: goals.q3MqlGoal?.toString() || "",
+        mqlQ4: goals.q4MqlGoal?.toString() || "",
+        sqlQ1: goals.q1SqlGoal?.toString() || "",
+        sqlQ2: goals.q2SqlGoal?.toString() || "",
+        sqlQ3: goals.q3SqlGoal?.toString() || "",
+        sqlQ4: goals.q4SqlGoal?.toString() || "",
+      });
+    } else {
+      setPipelineGoalInputs({
+        newDealsQ1: "", newDealsQ2: "", newDealsQ3: "", newDealsQ4: "",
+        mqlQ1: "", mqlQ2: "", mqlQ3: "", mqlQ4: "",
+        sqlQ1: "", sqlQ2: "", sqlQ3: "", sqlQ4: "",
+      });
+    }
+  };
+
+  const handleSavePipelineGoals = async (pipelineId: string, pipelineName: string) => {
+    if (!selectedAccount) return;
+    setIsSavingPipelineGoal(true);
+    try {
+      const response = await fetch("/api/pipeline-goals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hubspotAccountId: selectedAccount,
+          pipelineId,
+          pipelineName,
+          year: pipelineGoalYear,
+          q1Goal: pipelineGoalInputs.newDealsQ1 ? parseInt(pipelineGoalInputs.newDealsQ1) : 0,
+          q2Goal: pipelineGoalInputs.newDealsQ2 ? parseInt(pipelineGoalInputs.newDealsQ2) : 0,
+          q3Goal: pipelineGoalInputs.newDealsQ3 ? parseInt(pipelineGoalInputs.newDealsQ3) : 0,
+          q4Goal: pipelineGoalInputs.newDealsQ4 ? parseInt(pipelineGoalInputs.newDealsQ4) : 0,
+          q1MqlGoal: pipelineGoalInputs.mqlQ1 ? parseInt(pipelineGoalInputs.mqlQ1) : 0,
+          q2MqlGoal: pipelineGoalInputs.mqlQ2 ? parseInt(pipelineGoalInputs.mqlQ2) : 0,
+          q3MqlGoal: pipelineGoalInputs.mqlQ3 ? parseInt(pipelineGoalInputs.mqlQ3) : 0,
+          q4MqlGoal: pipelineGoalInputs.mqlQ4 ? parseInt(pipelineGoalInputs.mqlQ4) : 0,
+          q1SqlGoal: pipelineGoalInputs.sqlQ1 ? parseInt(pipelineGoalInputs.sqlQ1) : 0,
+          q2SqlGoal: pipelineGoalInputs.sqlQ2 ? parseInt(pipelineGoalInputs.sqlQ2) : 0,
+          q3SqlGoal: pipelineGoalInputs.sqlQ3 ? parseInt(pipelineGoalInputs.sqlQ3) : 0,
+          q4SqlGoal: pipelineGoalInputs.sqlQ4 ? parseInt(pipelineGoalInputs.sqlQ4) : 0,
+        }),
+      });
+
+      if (response.ok) {
+        const savedGoal = await response.json();
+        setPipelineGoals((prev) => ({
+          ...prev,
+          [`${pipelineId}-${pipelineGoalYear}`]: savedGoal,
+        }));
+        toast({
+          title: "Goals Saved",
+          description: `Pipeline goals for ${pipelineName} (${pipelineGoalYear}) have been saved.`,
+        });
+        setExpandedPipelineId(null);
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to save pipeline goals",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save pipeline goals. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingPipelineGoal(false);
+    }
+  };
+
   const { toast } = useToast();
 
   useEffect(() => {
@@ -787,6 +937,7 @@ export default function SettingsPage() {
     loadPipelines();
     loadLifecycleStageOptions();
     loadLifecycleStageSettings();
+    loadPipelineGoals();
   }, [user, selectedAccount, setLocation]);
 
   const loadForms = async () => {
@@ -1616,9 +1767,9 @@ export default function SettingsPage() {
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Included Pipelines</Label>
                         <p className="text-xs text-muted-foreground">
-                          Filter new deals based on specific pipelines
+                          Filter new deals based on specific pipelines. Click "Set Goals" to configure quarterly targets.
                         </p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                        <div className="space-y-2 mt-2">
                           {isLoadingPipelines ? (
                             <div className="flex items-center text-sm text-muted-foreground">
                               <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -1628,25 +1779,305 @@ export default function SettingsPage() {
                             availablePipelines.map((pipeline) => (
                               <div
                                 key={pipeline.id}
-                                className="flex items-center space-x-2"
+                                className="bg-muted/30 rounded-lg border overflow-hidden"
                               >
-                                <Checkbox
-                                  id={`pipeline-${pipeline.id}`}
-                                  checked={selectedPipelines.includes(pipeline.id)}
-                                  onCheckedChange={() =>
-                                    handlePipelineToggle(pipeline.id)
-                                  }
-                                />
-                                <Label
-                                  htmlFor={`pipeline-${pipeline.id}`}
-                                  className="text-sm font-normal cursor-pointer"
-                                >
-                                  {pipeline.label}
-                                </Label>
+                                <div className="flex items-center justify-between p-3">
+                                  <div className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`pipeline-${pipeline.id}`}
+                                      checked={selectedPipelines.includes(pipeline.id)}
+                                      onCheckedChange={() =>
+                                        handlePipelineToggle(pipeline.id)
+                                      }
+                                    />
+                                    <Label
+                                      htmlFor={`pipeline-${pipeline.id}`}
+                                      className="text-sm font-normal cursor-pointer"
+                                    >
+                                      {pipeline.label}
+                                    </Label>
+                                  </div>
+                                  {selectedPipelines.includes(pipeline.id) && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-muted-foreground hover:text-primary"
+                                      onClick={() => handleTogglePipelineGoals(pipeline.id)}
+                                      data-testid={`button-pipeline-goals-${pipeline.id}`}
+                                    >
+                                      <Target className="w-4 h-4 mr-1" />
+                                      Set Goals
+                                      {expandedPipelineId === pipeline.id ? (
+                                        <ChevronUp className="w-4 h-4 ml-1" />
+                                      ) : (
+                                        <ChevronDown className="w-4 h-4 ml-1" />
+                                      )}
+                                    </Button>
+                                  )}
+                                </div>
+
+                                {expandedPipelineId === pipeline.id && selectedPipelines.includes(pipeline.id) && (
+                                  <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: "auto", opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="border-t bg-background/50 p-4"
+                                  >
+                                    <div className="space-y-4">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-sm font-medium">Year:</span>
+                                        <Select
+                                          value={pipelineGoalYear.toString()}
+                                          onValueChange={(val) =>
+                                            handlePipelineGoalYearChange(parseInt(val), pipeline.id)
+                                          }
+                                        >
+                                          <SelectTrigger className="w-28" data-testid={`select-pipeline-year-${pipeline.id}`}>
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {yearOptions.map((year) => (
+                                              <SelectItem key={year} value={year.toString()}>
+                                                {year}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+
+                                      {/* New Deals Goals */}
+                                      <div className="space-y-2">
+                                        <Label className="text-xs font-medium text-muted-foreground">New Deals Goals</Label>
+                                        <div className="grid grid-cols-4 gap-2">
+                                          <div>
+                                            <label className="text-xs text-muted-foreground mb-1 block">Q1</label>
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              value={pipelineGoalInputs.newDealsQ1}
+                                              onChange={(e) =>
+                                                setPipelineGoalInputs((prev) => ({
+                                                  ...prev,
+                                                  newDealsQ1: e.target.value,
+                                                }))
+                                              }
+                                              placeholder="0"
+                                              data-testid={`input-pipeline-deals-q1-${pipeline.id}`}
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="text-xs text-muted-foreground mb-1 block">Q2</label>
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              value={pipelineGoalInputs.newDealsQ2}
+                                              onChange={(e) =>
+                                                setPipelineGoalInputs((prev) => ({
+                                                  ...prev,
+                                                  newDealsQ2: e.target.value,
+                                                }))
+                                              }
+                                              placeholder="0"
+                                              data-testid={`input-pipeline-deals-q2-${pipeline.id}`}
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="text-xs text-muted-foreground mb-1 block">Q3</label>
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              value={pipelineGoalInputs.newDealsQ3}
+                                              onChange={(e) =>
+                                                setPipelineGoalInputs((prev) => ({
+                                                  ...prev,
+                                                  newDealsQ3: e.target.value,
+                                                }))
+                                              }
+                                              placeholder="0"
+                                              data-testid={`input-pipeline-deals-q3-${pipeline.id}`}
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="text-xs text-muted-foreground mb-1 block">Q4</label>
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              value={pipelineGoalInputs.newDealsQ4}
+                                              onChange={(e) =>
+                                                setPipelineGoalInputs((prev) => ({
+                                                  ...prev,
+                                                  newDealsQ4: e.target.value,
+                                                }))
+                                              }
+                                              placeholder="0"
+                                              data-testid={`input-pipeline-deals-q4-${pipeline.id}`}
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* MQL Goals */}
+                                      <div className="space-y-2">
+                                        <Label className="text-xs font-medium text-muted-foreground">MQL Goals</Label>
+                                        <div className="grid grid-cols-4 gap-2">
+                                          <div>
+                                            <label className="text-xs text-muted-foreground mb-1 block">Q1</label>
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              value={pipelineGoalInputs.mqlQ1}
+                                              onChange={(e) =>
+                                                setPipelineGoalInputs((prev) => ({
+                                                  ...prev,
+                                                  mqlQ1: e.target.value,
+                                                }))
+                                              }
+                                              placeholder="0"
+                                              data-testid={`input-pipeline-mql-q1-${pipeline.id}`}
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="text-xs text-muted-foreground mb-1 block">Q2</label>
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              value={pipelineGoalInputs.mqlQ2}
+                                              onChange={(e) =>
+                                                setPipelineGoalInputs((prev) => ({
+                                                  ...prev,
+                                                  mqlQ2: e.target.value,
+                                                }))
+                                              }
+                                              placeholder="0"
+                                              data-testid={`input-pipeline-mql-q2-${pipeline.id}`}
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="text-xs text-muted-foreground mb-1 block">Q3</label>
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              value={pipelineGoalInputs.mqlQ3}
+                                              onChange={(e) =>
+                                                setPipelineGoalInputs((prev) => ({
+                                                  ...prev,
+                                                  mqlQ3: e.target.value,
+                                                }))
+                                              }
+                                              placeholder="0"
+                                              data-testid={`input-pipeline-mql-q3-${pipeline.id}`}
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="text-xs text-muted-foreground mb-1 block">Q4</label>
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              value={pipelineGoalInputs.mqlQ4}
+                                              onChange={(e) =>
+                                                setPipelineGoalInputs((prev) => ({
+                                                  ...prev,
+                                                  mqlQ4: e.target.value,
+                                                }))
+                                              }
+                                              placeholder="0"
+                                              data-testid={`input-pipeline-mql-q4-${pipeline.id}`}
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* SQL Goals */}
+                                      <div className="space-y-2">
+                                        <Label className="text-xs font-medium text-muted-foreground">SQL Goals</Label>
+                                        <div className="grid grid-cols-4 gap-2">
+                                          <div>
+                                            <label className="text-xs text-muted-foreground mb-1 block">Q1</label>
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              value={pipelineGoalInputs.sqlQ1}
+                                              onChange={(e) =>
+                                                setPipelineGoalInputs((prev) => ({
+                                                  ...prev,
+                                                  sqlQ1: e.target.value,
+                                                }))
+                                              }
+                                              placeholder="0"
+                                              data-testid={`input-pipeline-sql-q1-${pipeline.id}`}
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="text-xs text-muted-foreground mb-1 block">Q2</label>
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              value={pipelineGoalInputs.sqlQ2}
+                                              onChange={(e) =>
+                                                setPipelineGoalInputs((prev) => ({
+                                                  ...prev,
+                                                  sqlQ2: e.target.value,
+                                                }))
+                                              }
+                                              placeholder="0"
+                                              data-testid={`input-pipeline-sql-q2-${pipeline.id}`}
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="text-xs text-muted-foreground mb-1 block">Q3</label>
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              value={pipelineGoalInputs.sqlQ3}
+                                              onChange={(e) =>
+                                                setPipelineGoalInputs((prev) => ({
+                                                  ...prev,
+                                                  sqlQ3: e.target.value,
+                                                }))
+                                              }
+                                              placeholder="0"
+                                              data-testid={`input-pipeline-sql-q3-${pipeline.id}`}
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="text-xs text-muted-foreground mb-1 block">Q4</label>
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              value={pipelineGoalInputs.sqlQ4}
+                                              onChange={(e) =>
+                                                setPipelineGoalInputs((prev) => ({
+                                                  ...prev,
+                                                  sqlQ4: e.target.value,
+                                                }))
+                                              }
+                                              placeholder="0"
+                                              data-testid={`input-pipeline-sql-q4-${pipeline.id}`}
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <Button
+                                        onClick={() => handleSavePipelineGoals(pipeline.id, pipeline.label)}
+                                        disabled={isSavingPipelineGoal}
+                                        size="sm"
+                                        data-testid={`button-save-pipeline-goals-${pipeline.id}`}
+                                      >
+                                        {isSavingPipelineGoal ? (
+                                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                        ) : (
+                                          <Save className="w-4 h-4 mr-2" />
+                                        )}
+                                        Save Pipeline Goals
+                                      </Button>
+                                    </div>
+                                  </motion.div>
+                                )}
                               </div>
                             ))
                           ) : (
-                            <p className="text-xs text-muted-foreground col-span-2 italic">
+                            <p className="text-xs text-muted-foreground italic">
                               No pipelines found for this account.
                             </p>
                           )}
